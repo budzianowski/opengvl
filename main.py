@@ -9,18 +9,19 @@ Run:
 python main.py --name fmb:0.0.1 --max_frames 20 --model gpt4o
 """
 
-import tensorflow_datasets as tfds
-import tensorflow as tf
-import numpy as np
-import random
-import os
-from PIL import Image
-import matplotlib.pyplot as plt
-from typing import List, Tuple, Optional
-import tempfile
 import argparse
 import base64
+import os
+import random
+import tempfile
 from abc import ABC, abstractmethod
+from typing import List, Optional, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+import tensorflow_datasets as tfds
+from PIL import Image
 
 # Model-specific imports
 try:
@@ -29,8 +30,9 @@ except ImportError:
     openai = None
 
 try:
-    from transformers import AutoProcessor, AutoModelForImageTextToText, JanusForConditionalGeneration, JanusProcessor
     import torch
+    from transformers import (AutoModelForImageTextToText, AutoProcessor,
+                              JanusForConditionalGeneration, JanusProcessor)
 except ImportError:
     torch = None
 
@@ -77,23 +79,24 @@ class GPT4oClient(BaseModelClient):
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{self.encode_image(image_paths[0])}"}},
             {"type": "text", "text": f"In the initial robot scene, the task completion percentage is 0."}
         ])
+
+        messages[0]["content"].append({"type": "text", "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%"})
+        
         # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
+        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:len(example_indices)])):
             messages[0]["content"].extend([
-                {"type": "text", "text": f"Example {i+1}: "},
+                {"type": "text", "text": f"Frame {i+1}: "},
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{self.encode_image(path)}"}},
                 {"type": "text", "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%"}
             ])
         
-        messages[0]["content"].append({"type": "text", "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%"})
-        
         # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
+        for i, path in enumerate(image_paths[len(example_indices):], 1):
             messages[0]["content"].extend([
-                {"type": "text", "text": f"Frame {i}: "},
+                {"type": "text", "text": f"Frame {len(example_indices) + i}: "},
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{self.encode_image(path)}"}}
             ])
-        
+
         response = self.client.chat.completions.create(
             model="gpt-4o",
             messages=messages
@@ -129,21 +132,21 @@ class InternVLClient(BaseModelClient):
             {"type": "text", "text": "In the initial robot scene, the task completion percentage is 0."}
         ])
         
-        # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
-            content.extend([
-                {"type": "text", "text": f"Example {i+1}:"},
-                {"type": "image", "url": path},
-                {"type": "text", "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%"}
-            ])
         
         # Add query instruction
         content.append({"type": "text", "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%"})
         
-        # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
+        # Add example images with completion percentages
+        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:len(example_indices)])):
             content.extend([
-                {"type": "text", "text": f"Frame {i}:"},
+                {"type": "text", "text": f"Frame {i+1}:"},
+                {"type": "image", "url": path},
+                {"type": "text", "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%"}
+            ])
+        # Add query images
+        for i, path in enumerate(image_paths[len(example_indices):], 1):
+            content.extend([
+                {"type": "text", "text": f"Frame {len(example_indices) + i}:"},
                 {"type": "image", "url": path}
             ])
         
@@ -186,21 +189,20 @@ class JanusClient(BaseModelClient):
             {"type": "text", "text": "In the initial robot scene, the task completion percentage is 0."}
         ])
         
-        # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
-            content.extend([
-                {"type": "text", "text": f"Example {i+1}:"},
-                {"type": "image", "url": path},
-                {"type": "text", "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%"}
-            ])
-        
         # Add query instruction
         content.append({"type": "text", "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%"})
         
-        # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
+        # Add example images with completion percentages
+        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:len(example_indices)])):
             content.extend([
-                {"type": "text", "text": f"Frame {i}:"},
+                {"type": "text", "text": f"Frame {i+1}:"},
+                {"type": "image", "url": path},
+                {"type": "text", "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%"}
+            ])
+        # Add query images
+        for i, path in enumerate(image_paths[len(example_indices):], 1):
+            content.extend([
+                {"type": "text", "text": f"Frame {len(example_indices) + i}:"},
                 {"type": "image", "url": path}
             ])
         
@@ -237,19 +239,19 @@ class GeminiClient(BaseModelClient):
             contents.append(types.Part.from_bytes(data=f.read(), mime_type='image/png'))
         contents.append("In the initial robot scene, the task completion percentage is 0.")
         
+        # Add query instruction
+        contents.append(f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%")
+        
         # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
-            contents.append(f"Example {i+1}:")
+        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:len(example_indices)])):
+            contents.append(f"Frame {i+1}:")
             with open(path, 'rb') as f:
                 contents.append(types.Part.from_bytes(data=f.read(), mime_type='image/png'))
             contents.append(f"Task Completion Percentage: {idx/total_frames*100:.1f}%")
         
-        # Add query instruction
-        contents.append(f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%")
-        
         # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
-            contents.append(f"Frame {i}:")
+        for i, path in enumerate(image_paths[len(example_indices):], 1):
+            contents.append(f"Frame {len(example_indices) + i}:")
             with open(path, 'rb') as f:
                 contents.append(types.Part.from_bytes(data=f.read(), mime_type='image/png'))
         
@@ -353,7 +355,7 @@ class OXEDataLoader:
         return selected_images, indices, len(images)
 
 
-def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
+def main(name: str, max_frames: int = 10, num_example_frames=3, model: str = "gpt4o"):
     """Main function to run the OXE data loading and prompt generation."""
     
     # Initialize the data loader
@@ -403,12 +405,13 @@ def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
             corresponding task completion percentages. Note that these frames are
             in random order, so please pay attention to the individual frames
             when reasoning about task completion percentage."""
+
             response = client.generate_response(
                 prompt=prompt, 
                 image_paths=image_paths,
                 task_description=task_description,
-                example_indices=selected_indices[:4],
-                selected_indices=selected_indices[4:],
+                example_indices=selected_indices[:num_example_frames],
+                selected_indices=selected_indices[num_example_frames:],
                 total_frames=total_frames
             )
             
@@ -420,9 +423,9 @@ def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
             
             # Print ground truth for comparison
             print("\nGround Truth Completion Percentages:")
-            for i, idx in enumerate(selected_indices):
+            for i, idx in enumerate(selected_indices[num_example_frames:]):
                 completion = idx / total_frames * 100
-                print(f"Frame {i+1} (step {idx}): {completion:.1f}%")
+                print(f"Frame {num_example_frames + i + 1} (step {idx}): {completion:.1f}%")
                 
         except Exception as e:
             print(f"Error generating response: {e}")
@@ -435,9 +438,10 @@ def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, default="fmb:0.0.1", help="Dataset name")
-    parser.add_argument("--max_frames", type=int, default=4, help="Maximum number of frames to select")
+    parser.add_argument("--max_frames", type=int, default=10, help="Maximum number of frames to select")
+    parser.add_argument("--num_example_frames", type=int, default=3, help="Number of example frames to use")
     parser.add_argument("--model", type=str, default="gpt4o", 
                        choices=["gpt4o", "internvl", "janus", "gemini"],
                        help="Model to use for inference")
     args = parser.parse_args()
-    main(args.name, args.max_frames, args.model)
+    main(args.name, args.max_frames, args.num_example_frames, args.model)
