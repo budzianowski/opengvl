@@ -5,7 +5,7 @@ from scipy.stats import spearmanr
 def value_order_correlation(values: list[int], time_order: list[int]):
     """
     Computes the Value-Order Correlation (VOC) for a sequence of predicted values.
-    
+
     Args:
         values (list or np.ndarray): Sequence of predicted values v_1, ..., v_T.
         the values are between 0 and 100
@@ -22,9 +22,13 @@ def value_order_correlation(values: list[int], time_order: list[int]):
 
 def test_value_order_correlation():
     # Increasing order
-    assert np.isclose(value_order_correlation([0, 25, 50, 75, 100], [0, 1, 2, 3, 4]), 1.0)
+    assert np.isclose(
+        value_order_correlation([0, 25, 50, 75, 100], [0, 1, 2, 3, 4]), 1.0
+    )
     # Decreasing order
-    assert np.isclose(value_order_correlation([100, 75, 50, 25, 0], [4, 3, 2, 1, 0]), 1.0)
+    assert np.isclose(
+        value_order_correlation([100, 75, 50, 25, 0], [4, 3, 2, 1, 0]), 1.0
+    )
 
     # Constant values
     assert np.isnan(value_order_correlation([50, 50, 50, 50, 50], [0, 1, 2, 3, 4]))
