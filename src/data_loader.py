@@ -1,4 +1,7 @@
 """ Data loader for the OXE dataset. """
+
+from __future__ import annotations
+
 import os
 import random
 from typing import List, Tuple

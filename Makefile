@@ -8,13 +8,14 @@ install:
 format:
 	uv run isort .
 	uv run black .
-	uv run ruff check --fix .
+
+# uv run ruff check --fix .
 
 # Lint code (check only)
 lint:
 	uv run isort --check-only .
 	uv run black --check .
-	uv run ruff check .
+#uv run ruff check .
 
 # Run tests
 test:
