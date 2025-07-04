@@ -104,7 +104,7 @@ if __name__ == "__main__":
         "--model",
         type=str,
         default="gpt4o",
-        choices=["gpt4o", "internvl", "janus", "gemini"],
+        choices=["gpt4o", "internvl", "gemma", "gemini"],
         help="Model to use for inference",
     )
     args = parser.parse_args()
