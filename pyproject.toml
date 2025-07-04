@@ -1,41 +1,87 @@
 [project]
-name = "openglv"
+name = "gvl"
 version = "0.1.0"
-description = "A description of the openxyz project."
-authors = [
-    {name = "Your Name",email = "you@example.com"}
-]
+description = "Open source implementation of Generative Value Learning"
 readme = "README.md"
-requires-python = "^3.11"
+authors = [
+    { name = "Paweł Budzianowski", email = "budzianowski@gmail.com" },
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
 dependencies = [
-    "matplotlib (>=3.10.3,<4.0.0)",
-    "tensorflow-datasets (>=4.9.9,<5.0.0)",
-    "torch (>=2.7.1,<3.0.0)",
-    "transformers (>=4.52.4,<5.0.0)",
-    "openai (>=1.91.0,<2.0.0)",
-    "google-genai (>=1.22.0,<2.0.0)",
-    "tensorflow (>=2.19.0,<3.0.0)",
-    "isort (>=6.0.1,<7.0.0)",
-    "black (>=25.1.0,<26.0.0)",
-    "scipy (>=1.16.0,<2.0.0)"
+    "isort>=6.0.1",
+    "numpy>=2.3.1",
+    "pytest>=8.4.1",
+    "ruff>=0.12.2",
+    "scipy>=1.16.0",
+    "tensorflow-macos==2.14.0",
+    "tfds>=0.3",
+    "transformers>=4.53.0",
 ]
 
-[tool.poetry]
+[project.optional-dependencies]
+closed = [
+    "openai>=1.93.0",
+    "google-genai>=1.22.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.4.1"
-black = "^25.1.0"
-isort = "^6.0.1"
-pre-commit = "^4.2.0"
+[dependency-groups]
+dev = [
+    "black>=24.10.0",
+    "pytest>=8.4.1",
+    "ruff>=0.12.2",
+]
 
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+fix = true
+
+[tool.ruff.lint]
+select = [
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-builtins
+    "A",
+    # flake8-comprehensions
+    "C4",
+    # flake8-debugger
+    "T10",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # mccabe
+    "C90",
+    # pycodestyle
+    "E", "W",
+    # pyflakes
+    "F",
+    # pygrep-hooks
+    "PGH",
+    # pyupgrade
+    "UP",
+    # ruff
+    "RUF",
+    # tryceratops
+    "TRY",
+]
+ignore = [
+    # LineTooLong
+    "E501",
+    # DoNotAssignLambda
+    "E731",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S603"]
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
 
 [tool.black]
-line-length = 88
-target-version = ['py311']
-
-[tool.isort]
-profile = "black"
-line_length = 88
+line-length = 120
