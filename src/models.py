@@ -7,9 +7,11 @@ from abc import ABC, abstractmethod
 from typing import List
 
 import torch
+import numpy as np
 from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM
+from dataclasses import dataclass
 
-# Third-party imports
+# third-party imports
 try:
     import openai
 except ImportError:
@@ -20,6 +22,17 @@ try:
     from google.genai import types
 except ImportError:
     genai = None
+
+
+@dataclass
+class Episode:
+    frames: list[np.ndarray]
+
+
+@dataclass
+class Example:
+    instruction: str
+    examples: List[Episode]
 
 
 class BaseModelClient(ABC):
@@ -209,23 +222,69 @@ class GemmaClient(BaseModelClient):
 
         model_id = "google/gemma-3-1b-it"
         self.model = Gemma3ForCausalLM.from_pretrained(model_id, device_map="auto").eval()
+        self.processor = AutoProcessor.from_pretrained(model_id)
 
-
-processor = AutoProcessor.from_pretrained(model_id)
-
-messages = [
-    {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
-    {
-        "role": "user",
-        "content": [
+    def generate_response(
+        self,
+        prompt: str,
+        image_paths: List[str],
+        task_description: str,
+        example_indices: List[int],
+        selected_indices: List[int],
+        total_frames: int,
+    ) -> str:
+        
+        # Build messages for Gemma following the provided example structure
+        messages = [
+            {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
             {
-                "type": "image",
-                "image": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/bee.jpg",
-            },
-            {"type": "text", "text": "Describe this image in detail."},
-        ],
-    },
-]
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                ]
+            }
+        ]
+
+        # Add initial scene
+        messages[1]["content"].extend([
+            {"type": "text", "text": "Initial robot scene:"},
+            {"type": "image", "image": image_paths[0]},
+            {"type": "text", "text": "In the initial robot scene, the task completion percentage is 0."}
+        ])
+
+        # Add example images with completion percentages
+        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
+            messages[1]["content"].extend([
+                {"type": "text", "text": f"Example {i+1}:"},
+                {"type": "image", "image": path},
+                {"type": "text", "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%"}
+            ])
+
+        # Add query instruction
+        messages[1]["content"].append({
+            "type": "text",
+            "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%"
+        })
+
+        # Add query images
+        for i, path in enumerate(image_paths[4:], 1):
+            messages[1]["content"].extend([
+                {"type": "text", "text": f"Frame {i}:"},
+                {"type": "image", "image": path}
+            ])
+
+        inputs = self.processor.apply_chat_template(
+            messages,
+            padding=True,
+            add_generation_prompt=True,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt"
+        ).to(self.model.device)
+
+        output = self.model.generate(**inputs, max_new_tokens=400)
+        decoded_outputs = self.processor.batch_decode(output, skip_special_tokens=True)
+        return decoded_outputs[0]
 
 
 class GeminiClient(BaseModelClient):
