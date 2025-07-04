@@ -46,8 +46,8 @@ class BaseModelClient(ABC):
         image_paths: List[str],
         task_description: str,
         example_indices: List[int],
-        selected_indices: List[int],
         total_frames: int,
+        num_context_frames: int,
     ) -> str:
         """Generate response from the model"""
         pass
@@ -71,8 +71,8 @@ class GPT4oClient(BaseModelClient):
         image_paths: List[str],
         task_description: str,
         example_indices: List[int],
-        selected_indices: List[int],
         total_frames: int,
+        num_context_frames: int,
     ) -> str:
 
         messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
@@ -91,7 +91,7 @@ class GPT4oClient(BaseModelClient):
             ]
         )
         # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
+        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:num_context_frames])):
             messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Example {i+1}: "},
@@ -114,7 +114,7 @@ class GPT4oClient(BaseModelClient):
         )
 
         # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
+        for i, path in enumerate(image_paths[num_context_frames:], 1):
             messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Frame {i}: "},
@@ -149,7 +149,6 @@ class InternVLClient(BaseModelClient):
         image_paths: List[str],
         task_description: str,
         example_indices: List[int],
-        selected_indices: List[int],
         total_frames: int,
     ) -> str:
 
@@ -231,7 +230,6 @@ class GemmaClient(BaseModelClient):
         image_paths: List[str],
         task_description: str,
         example_indices: List[int],
-        selected_indices: List[int],
         total_frames: int,
     ) -> str:
 
@@ -300,7 +298,6 @@ class GeminiClient(BaseModelClient):
         image_paths: List[str],
         task_description: str,
         example_indices: List[int],
-        selected_indices: List[int],
         total_frames: int,
     ) -> str:
 

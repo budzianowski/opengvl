@@ -7,7 +7,7 @@ Download dataset:
 gsutil -m cp -r gs://gresearch/robotics/fmb ~/tensorflow_datasets/
 
 Run:
-python main.py --name fmb:0.0.1 --max_frames 20 --model gpt4o
+python src/main.py --name fmb:0.0.1 --max_frames 4 --model gpt4o
 """
 
 from __future__ import annotations
@@ -16,9 +16,10 @@ import argparse
 
 from data_loader import OXEDataLoader
 from models import ModelFactory
+from voc_score import value_order_correlation, parse_response
 
 
-def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
+def main(name: str, max_frames: int = 10, num_context_frames: int = 4, model: str = "gpt4o"):
     """Main function to run the OXE data loading and prompt generation."""
 
     # Initialize the data loader
@@ -72,9 +73,9 @@ def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
                 prompt=prompt,
                 image_paths=image_paths,
                 task_description=task_description,
-                example_indices=selected_indices[:4],
-                selected_indices=selected_indices[4:],
+                example_indices=selected_indices[:num_context_frames],
                 total_frames=total_frames,
+                num_context_frames=num_context_frames,
             )
 
             print("\n" + "=" * 80)
@@ -83,12 +84,13 @@ def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
             print(response)
             print("=" * 80)
 
-            # Print ground truth for comparison
             print("\nGround Truth Completion Percentages:")
-            for i, idx in enumerate(selected_indices):
+            for i, idx in enumerate(selected_indices[num_context_frames:]):
                 completion = idx / total_frames * 100
                 print(f"Frame {i+1} (step {idx}): {completion:.1f}%")
 
+            print(f"VOC: {value_order_correlation(parse_response(response), selected_indices[num_context_frames:])}")
+        
         except Exception as e:
             print(f"Error generating response: {e}")
 
@@ -100,7 +102,8 @@ def main(name: str, max_frames: int = 4, model: str = "gpt4o"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, default="fmb:0.0.1", help="Dataset name")
-    parser.add_argument("--max_frames", type=int, default=4, help="Maximum number of frames to select")
+    parser.add_argument("--max_frames", type=int, default=10, help="Maximum number of frames to select")
+    parser.add_argument("--num_context_frames", type=int, default=4, help="Number of context frames to use")
     parser.add_argument(
         "--model",
         type=str,
@@ -109,4 +112,4 @@ if __name__ == "__main__":
         help="Model to use for inference",
     )
     args = parser.parse_args()
-    main(args.name, args.max_frames, args.model)
+    main(args.name, args.max_frames, args.num_context_frames, args.model)
