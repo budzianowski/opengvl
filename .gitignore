@@ -86,3 +86,7 @@ Thumbs.db
 ehthumbs.db
 ehthumbs_vista.db
 *.lnk
+
+# API keys and sensitive information
+.env
+.env.local

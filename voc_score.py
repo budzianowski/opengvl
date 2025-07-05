@@ -2,21 +2,36 @@ import numpy as np
 from scipy.stats import spearmanr
 
 
-def value_order_correlation(values: list[int], time_order: list[int]):
+def value_order_correlation(values: list[int]):
     """
     Computes the Value-Order Correlation (VOC) for a sequence of predicted values.
 
     Args:
         values (list or np.ndarray): Sequence of predicted values v_1, ..., v_T.
-        the values are between 0 and 100
-        time_order (list or np.ndarray): Sequence of time indices t_1, ..., t_T.
+        The values are between 0 and 100.
+
     Returns:
         float: Spearman rank correlation coefficient between the predicted value order
-               and the chronological order.
+               and the chronological order. Returns 0 for constant input.
     """
-    time_order_values = [values[i] for i in time_order]
+    # It's good practice to convert the input to a numpy array
+    values = np.asarray(values)
+
+    # A simple check for constant input is more direct
+    if np.all(values == values[0]):
+        return 0.0
+
     T = len(values)
-    voc, _ = spearmanr(time_order_values, np.arange(T))
+    # Handle cases with less than 2 elements where correlation is not well-defined
+    if T < 2:
+        return 0.0
+
+    voc, _ = spearmanr(values, np.arange(T))
+
+    # spearmanr can return nan in cases of no variance, so we check for it.
+    if np.isnan(voc):
+        return 0.0
+
     return voc
 
 
