@@ -14,46 +14,33 @@ from __future__ import annotations
 
 import argparse
 
-from data_loader import OXEDataLoader
+from data_loader import DataLoader
 from models import ModelFactory
-from voc_score import value_order_correlation, parse_response
+from voc_score import parse_response, value_order_correlation
 
 
-def main(name: str, max_frames: int = 10, num_context_frames: int = 4, model: str = "gpt4o"):
-    """Main function to run the OXE data loading and prompt generation."""
+def main(
+        name: str,
+        num_eval_steps: int = 5,
+        max_frames: int = 10, 
+        num_context_frames: int = 4, 
+        model: str = "gpt4o",
+        num_context_episodes: int = 2,
+        camera_index: int = 0,
+    ):
+    """Main function to run the data loading and prompt generation."""
 
-    # Initialize the data loader
-    print("Initializing OXE data loader...")
-    loader = OXEDataLoader(dataset_name=name)
+    loader = DataLoader(
+        dataset_name=name,
+        num_context_episodes=num_context_episodes,
+        num_frames=max_frames,
+        camera_index=camera_index,
+    )
 
-    # Create model client
-    print(f"Initializing {model} client...")
-    try:
-        client = ModelFactory.create_client(model)
-    except Exception as e:
-        print(f"Error creating {model} client: {e}")
-        return
+    client = ModelFactory.create_client(model)
 
-    # Load dataset
-    print("Loading dataset...")
-    dataset = loader.load_dataset()
-
-    print("Processing episode...")
-    for episode in dataset.take(1):
-        images, task_description = loader.extract_episode_images(episode)
-
-        if not images:
-            print("No images found in episode")
-            continue
-
-        print(f"Found {len(images)} images in episode")
-        print(f"Task: {task_description}")
-
-        # Select random frames (including initial frame)
-        n_frames = min(max_frames, len(images))
-        selected_images, selected_indices, total_frames = loader.select_random_frames(images, n_frames)
-
-        print(f"Selected {len(selected_images)} frames at indices: {selected_indices}")
+    for eval_step in range(num_eval_steps):
+        example = loader.load_example()
 
         # Save images to files
         image_paths = loader.save_images_to_files(selected_images)
@@ -62,7 +49,7 @@ def main(name: str, max_frames: int = 10, num_context_frames: int = 4, model: st
         print(f"\nSending to {model}...")
         try:
             prompt = f"""You are an expert roboticist tasked to predict task completion
-            percentages for frames of a robot for the task of {task_description}.
+            percentages for frames of a robot for the task of {example.instructions[0]}.
             The task completion percentages are between 0 and 100, where 100
             corresponds to full task completion. We provide several examples of
             the robot performing the task at various stages and their
@@ -90,7 +77,7 @@ def main(name: str, max_frames: int = 10, num_context_frames: int = 4, model: st
                 print(f"Frame {i+1} (step {idx}): {completion:.1f}%")
 
             print(f"VOC: {value_order_correlation(parse_response(response), selected_indices[num_context_frames:])}")
-        
+
         except Exception as e:
             print(f"Error generating response: {e}")
 
