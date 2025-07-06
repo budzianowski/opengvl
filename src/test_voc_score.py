@@ -10,13 +10,15 @@ class TestValueOrderCorrelation:
     """Test suite for value_order_correlation function."""
 
     @pytest.mark.parametrize(
-        "values,time_order,expected",
+        "values,true_values,expected",
         [
             # Perfect positive correlation
-            ([0, 25, 50, 75, 100], [0, 1, 2, 3, 4], 1.0),
+            ([25, 10, 50, 11, 12], [0, 10, 25, 50, 11], 1.0),
+            ([25, 10, 50, 11, 12], [0, 89, 29, 90, 80], 1.0),
+            ([0, 25, 50, 75, 100], [0, 25, 50, 75, 100], 1.0),
             ([1, 2, 3, 4, 5], [0, 1, 2, 3, 4], 1.0),
             # Perfect negative correlation
-            ([100, 75, 50, 25, 0], [0, 1, 2, 3, 4], -1.0),
+            ([100, 75, 50, 25, 0], [0, 25, 50, 75, 100], -1.0),
             ([5, 4, 3, 2, 1], [0, 1, 2, 3, 4], -1.0),
             # Two element cases
             ([0, 100], [0, 1], 1.0),
@@ -27,9 +29,9 @@ class TestValueOrderCorrelation:
             ([0, 100, 50], [0, 1, 2], 0.5),
         ],
     )
-    def test_known_correlations(self, values, time_order, expected):
+    def test_known_correlations(self, values, true_values, expected):
         """Test cases with known expected correlations."""
-        result = value_order_correlation(values, time_order)
+        result = value_order_correlation(values, true_values)
         if np.isnan(expected):
             assert np.isnan(result)
         else:
@@ -40,25 +42,25 @@ class TestValueOrderCorrelation:
         constant_cases = [[50, 50, 50, 50, 50], [0, 0, 0], [100, 100], [42] * 10]
 
         for values in constant_cases:
-            time_order = list(range(len(values)))
-            result = value_order_correlation(values, time_order)
+            true_values = list(range(len(values)))
+            result = value_order_correlation(values, true_values)
             assert np.isnan(result), f"Expected NaN for constant values {values}"
 
-    def test_different_time_orders(self):
-        """Test same values with different time orderings."""
+    def test_different_true_values(self):
+        """Test same values with different true value orderings."""
         values = [10, 20, 30, 40, 50]
 
-        # Chronological order: time_order_values = [10,20,30,40,50] -> perfect positive correlation
+        # Ascending true values -> perfect positive correlation
         voc1 = value_order_correlation(values, [0, 1, 2, 3, 4])
 
-        # Reverse chronological order: time_order_values = [50,40,30,20,10] -> perfect negative correlation
+        # Descending true values -> perfect negative correlation
         voc2 = value_order_correlation(values, [4, 3, 2, 1, 0])
 
-        # Random order: time_order_values = [30,10,50,20,40] -> some correlation
+        # Random true values -> some correlation
         voc3 = value_order_correlation(values, [2, 0, 4, 1, 3])
 
         assert np.isclose(voc1, 1.0)
-        assert np.isclose(voc2, -1.0)  # Decreasing sequence
+        assert np.isclose(voc2, -1.0)
         assert -1.0 <= voc3 <= 1.0
 
     @pytest.mark.parametrize("length", [1, 2, 3, 5, 10, 100])
@@ -66,9 +68,9 @@ class TestValueOrderCorrelation:
         """Test random sequences of various lengths."""
         np.random.seed(42)  # For reproducibility
         values = np.random.randint(0, 101, length).tolist()
-        time_order = list(range(length))
+        true_values = np.random.randint(0, 101, length).tolist()
 
-        result = value_order_correlation(values, time_order)
+        result = value_order_correlation(values, true_values)
 
         # Result should be between -1 and 1, or NaN for constant sequences
         assert np.isnan(result) or (-1.0 <= result <= 1.0)
@@ -100,8 +102,8 @@ class TestValueOrderCorrelation:
         """Test sequences with some duplicate values."""
         # Some duplicates but not all
         values = [10, 20, 20, 30, 30, 40]
-        time_order = [0, 1, 2, 3, 4, 5]
-        result = value_order_correlation(values, time_order)
+        true_values = [0, 1, 2, 3, 4, 5]
+        result = value_order_correlation(values, true_values)
 
         # Should still compute correlation, not NaN
         assert not np.isnan(result)
@@ -110,27 +112,27 @@ class TestValueOrderCorrelation:
     def test_anticorrelated_sequences(self):
         """Test sequences that show negative correlation."""
         test_cases = [
-            # When time_order gives us decreasing values
-            ([1, 2, 3, 4, 5], [4, 3, 2, 1, 0]),  # Values: [5,4,3,2,1] - decreasing
-            ([0, 10, 20, 30], [3, 2, 1, 0]),  # Values: [30,20,10,0] - decreasing
+            # When true_values decrease as predicted values increase
+            ([1, 2, 3, 4, 5], [4, 3, 2, 1, 0]),  # Perfect negative correlation
+            ([0, 10, 20, 30], [3, 2, 1, 0]),  # Perfect negative correlation
         ]
 
-        for values, time_order in test_cases:
-            result = value_order_correlation(values, time_order)
-            assert np.isclose(result, -1.0, atol=1e-10)  # Should be -1.0 for decreasing
+        for values, true_values in test_cases:
+            result = value_order_correlation(values, true_values)
+            assert np.isclose(result, -1.0, atol=1e-10)  # Should be -1.0 for perfect negative correlation
 
     def test_complex_patterns(self):
         """Test more complex correlation patterns."""
         # Alternating pattern
         values = [1, 3, 2, 4, 3, 5]
-        time_order = [0, 1, 2, 3, 4, 5]
-        result1 = value_order_correlation(values, time_order)
+        true_values = [0, 1, 2, 3, 4, 5]
+        result1 = value_order_correlation(values, true_values)
         assert -1.0 <= result1 <= 1.0
 
         # Mountain pattern (up then down)
         values = [1, 2, 3, 4, 3, 2, 1]
-        time_order = [0, 1, 2, 3, 4, 5, 6]
-        result2 = value_order_correlation(values, time_order)
+        true_values = [0, 1, 2, 3, 4, 5, 6]
+        result2 = value_order_correlation(values, true_values)
         assert -1.0 <= result2 <= 1.0
 
     def test_input_validation_edge_cases(self):
@@ -140,24 +142,24 @@ class TestValueOrderCorrelation:
         assert np.isnan(result)
 
         # Mismatched lengths
-        with pytest.raises(IndexError):
-            value_order_correlation([1, 2, 3], [0, 1, 2, 3])  # time_order too long
-
-        # Invalid indices in time_order
-        with pytest.raises(IndexError):
-            value_order_correlation([1, 2, 3], [0, 1, 5])  # Index 5 doesn't exist
+        with pytest.raises(ValueError):
+            value_order_correlation([1, 2, 3], [0, 1, 2, 3])  # Different lengths
+        
+        # None true_values
+        with pytest.raises(ValueError):
+            value_order_correlation([1, 2, 3], None)
 
     def test_numpy_array_inputs(self):
         """Test that function works with numpy arrays as well as lists."""
         values_list = [10, 20, 30, 40, 50]
         values_array = np.array(values_list)
-        time_order_list = [0, 1, 2, 3, 4]
-        time_order_array = np.array(time_order_list)
+        true_values_list = [0, 1, 2, 3, 4]
+        true_values_array = np.array(true_values_list)
 
-        result_list = value_order_correlation(values_list, time_order_list)
-        result_mixed1 = value_order_correlation(values_array, time_order_list)
-        result_mixed2 = value_order_correlation(values_list, time_order_array)
-        result_array = value_order_correlation(values_array, time_order_array)
+        result_list = value_order_correlation(values_list, true_values_list)
+        result_mixed1 = value_order_correlation(values_array, true_values_list)
+        result_mixed2 = value_order_correlation(values_list, true_values_array)
+        result_array = value_order_correlation(values_array, true_values_array)
 
         # All should give the same result
         assert np.isclose(result_list, result_mixed1)

@@ -12,6 +12,7 @@ import argparse
 @dataclass
 class Episode:
     instruction: str
+    starting_frame: np.ndarray
     episode_indices: list[int]
     original_frames_indices: list[int]
     shuffled_frames_indices: list[int]
@@ -21,7 +22,7 @@ class Episode:
 
 @dataclass
 class Example:
-    eval_episodes: Episode
+    eval_episode: Episode
     context_episodes: list[Episode]
 
 
@@ -73,6 +74,7 @@ class DataLoader:
             shuffled_frames = [selected_frames[i] for i in shuffled_indices]
 
             episode = Episode(
+                starting_frame=frames[0],
                 instruction=dataset[from_idx]["task"],
                 episode_indices=[episode_indices[idx]],
                 original_frames_indices=context_frames_indices.tolist(),
@@ -87,7 +89,7 @@ class DataLoader:
         context_episodes = episodes[1:]
 
         return Example(
-            eval_episodes=eval_episode,
+            eval_episode=eval_episode,
             context_episodes=context_episodes
         )
 
@@ -100,7 +102,7 @@ class DataLoader:
             plot_eval: If True, plot eval episode; if False, plot context episode at episode_idx
         """
         if plot_eval:
-            episode = example.eval_episodes
+            episode = example.eval_episode
         else:
             if episode_idx >= len(example.context_episodes):
                 print(f"Episode index {episode_idx} out of range. Available context episodes: {len(example.context_episodes)}")

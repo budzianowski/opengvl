@@ -1,17 +1,15 @@
 """Model clients for the different models."""
-
-from __future__ import annotations
-
 import base64
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import List
 
+from typing import List
+from data_loader import Episode
 import numpy as np
 import torch
 from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM
-
+import io
+from PIL import Image
 # third-party imports
 try:
     import openai
@@ -25,32 +23,57 @@ except ImportError:
     genai = None
 
 
-@dataclass
-class Episode:
-    frames: list[np.ndarray]
-
-
-@dataclass
-class Example:
-    instruction: str
-    examples: List[Episode]
-
-
-class BaseModelClient(ABC):
+class BaseModelClient:
     """Base class for all model clients"""
-
+    max_new_tokens = 1000
+    
     @abstractmethod
     def generate_response(
         self,
         prompt: str,
-        image_paths: List[str],
-        task_description: str,
-        example_indices: List[int],
-        total_frames: int,
-        num_context_frames: int,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
     ) -> str:
         """Generate response from the model"""
         pass
+
+    def encode_image(self, image) -> str:
+        """Encode image to base64 string for API calls"""
+        
+        # Convert tensor to numpy if needed
+        if hasattr(image, 'detach'):  # PyTorch tensor
+            if image.is_cuda:
+                image = image.cpu()
+            image = image.detach().numpy()
+        
+        # Handle different numpy array formats
+        if isinstance(image, np.ndarray):
+            # Normalize if values are in [0, 1] range
+            if image.dtype == np.float32 or image.dtype == np.float64:
+                if image.max() <= 1.0:
+                    image = (image * 255).astype(np.uint8)
+            
+            # Handle channel dimension - convert (C, H, W) to (H, W, C)
+            if len(image.shape) == 3 and image.shape[0] in [1, 3, 4]:
+                image = np.transpose(image, (1, 2, 0))
+            
+            # Convert to PIL Image
+            if len(image.shape) == 3 and image.shape[2] == 3:
+                pil_image = Image.fromarray(image, 'RGB')
+            elif len(image.shape) == 3 and image.shape[2] == 1:
+                pil_image = Image.fromarray(image.squeeze(), 'L')
+            elif len(image.shape) == 2:
+                pil_image = Image.fromarray(image, 'L')
+            else:
+                raise ValueError(f"Unsupported image shape: {image.shape}")
+        else:
+            # Assume it's already a PIL Image
+            pil_image = image
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        pil_image.save(buffer, format='PNG')
+        return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 
 class GPT4oClient(BaseModelClient):
@@ -61,18 +84,11 @@ class GPT4oClient(BaseModelClient):
             raise ImportError("OpenAI package not installed")
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-    def encode_image(self, image_path: str) -> str:
-        with open(image_path, "rb") as f:
-            return base64.b64encode(f.read()).decode("utf-8")
-
     def generate_response(
         self,
         prompt: str,
-        image_paths: List[str],
-        task_description: str,
-        example_indices: List[int],
-        total_frames: int,
-        num_context_frames: int,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
     ) -> str:
 
         messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]
@@ -82,7 +98,7 @@ class GPT4oClient(BaseModelClient):
                 {"type": "text", "text": "Initial robot scene:"},
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{self.encode_image(image_paths[0])}"},
+                    "image_url": {"url": f"data:image/png;base64,{self.encode_image(eval_episode.starting_frame)}"},
                 },
                 {
                     "type": "text",
@@ -91,40 +107,47 @@ class GPT4oClient(BaseModelClient):
             ]
         )
         # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:num_context_frames])):
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
             messages[0]["content"].extend(
                 [
-                    {"type": "text", "text": f"Example {i+1}: "},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{self.encode_image(path)}"},
-                    },
-                    {
-                        "type": "text",
-                        "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%",
-                    },
+                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
+                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
                 ]
             )
+
+            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                messages[0]["content"].extend(
+                    [
+                        {"type": "text", "text": f"Frame {i+1}: "},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{self.encode_image(frame)}"},
+                        },
+                        {
+                            "type": "text",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
+                        },
+                    ]
+                )
 
         messages[0]["content"].append(
             {
                 "type": "text",
-                "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
             }
         )
 
         # Add query images
-        for i, path in enumerate(image_paths[num_context_frames:], 1):
+        for i, frame in enumerate(eval_episode.frames, 1):
             messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Frame {i}: "},
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{self.encode_image(path)}"},
+                        "image_url": {"url": f"data:image/png;base64,{self.encode_image(frame)}"},
                     },
                 ]
             )
-
         response = self.client.chat.completions.create(model="gpt-4o", messages=messages)
         return response.choices[0].message.content
 
@@ -146,20 +169,17 @@ class InternVLClient(BaseModelClient):
     def generate_response(
         self,
         prompt: str,
-        image_paths: List[str],
-        task_description: str,
-        example_indices: List[int],
-        total_frames: int,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
     ) -> str:
-
-        # Build messages for InternVL following GPT4o structure
+        # Build messages for InternVL following GPT4o structure exactly
         content = [{"type": "text", "text": prompt}]
 
         # Add initial scene
         content.extend(
             [
                 {"type": "text", "text": "Initial robot scene:"},
-                {"type": "image", "url": image_paths[0]},
+                {"type": "image", "base64": self.encode_image(eval_episode.starting_frame)},
                 {
                     "type": "text",
                     "text": "In the initial robot scene, the task completion percentage is 0.",
@@ -168,32 +188,40 @@ class InternVLClient(BaseModelClient):
         )
 
         # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
             content.extend(
                 [
-                    {"type": "text", "text": f"Example {i+1}:"},
-                    {"type": "image", "url": path},
-                    {
-                        "type": "text",
-                        "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%",
-                    },
+                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
+                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
                 ]
             )
+
+            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                content.extend(
+                    [
+                        {"type": "text", "text": f"Frame {i+1}: "},
+                        {"type": "image", "base64": self.encode_image(frame)},
+                        {
+                            "type": "text",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
+                        },
+                    ]
+                )
 
         # Add query instruction
         content.append(
             {
                 "type": "text",
-                "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
             }
         )
 
         # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
+        for i, frame in enumerate(eval_episode.frames, 1):
             content.extend(
                 [
-                    {"type": "text", "text": f"Frame {i}:"},
-                    {"type": "image", "url": path},
+                    {"type": "text", "text": f"Frame {i}: "},
+                    {"type": "image", "base64": self.encode_image(frame)},
                 ]
             )
 
@@ -208,7 +236,7 @@ class InternVLClient(BaseModelClient):
             return_tensors="pt",
         ).to(self.model.device, dtype=torch.bfloat16)
 
-        output = self.model.generate(**inputs, max_new_tokens=400)
+        output = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
         decoded_outputs = self.processor.batch_decode(output, skip_special_tokens=True)
         return decoded_outputs[0]
 
@@ -227,13 +255,11 @@ class GemmaClient(BaseModelClient):
     def generate_response(
         self,
         prompt: str,
-        image_paths: List[str],
-        task_description: str,
-        example_indices: List[int],
-        total_frames: int,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
     ) -> str:
 
-        # Build messages for Gemma following the provided example structure
+        # Build messages for Gemma following GPT4o structure exactly
         messages = [
             {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
             {
@@ -248,38 +274,56 @@ class GemmaClient(BaseModelClient):
         messages[1]["content"].extend(
             [
                 {"type": "text", "text": "Initial robot scene:"},
-                {"type": "image", "image": image_paths[0]},
+                {"type": "image", "base64": self.encode_image(eval_episode.starting_frame)},
                 {"type": "text", "text": "In the initial robot scene, the task completion percentage is 0."},
             ]
         )
 
         # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
             messages[1]["content"].extend(
                 [
-                    {"type": "text", "text": f"Example {i+1}:"},
-                    {"type": "image", "image": path},
-                    {"type": "text", "text": f"Task Completion Percentage: {idx/total_frames*100:.1f}%"},
+                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
+                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
                 ]
             )
+
+            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                messages[1]["content"].extend(
+                    [
+                        {"type": "text", "text": f"Frame {i+1}: "},
+                        {"type": "image", "base64": self.encode_image(frame)},
+                        {"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}%"},
+                    ]
+                )
 
         # Add query instruction
         messages[1]["content"].append(
             {
                 "type": "text",
-                "text": f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
             }
         )
 
         # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
-            messages[1]["content"].extend([{"type": "text", "text": f"Frame {i}:"}, {"type": "image", "image": path}])
+        for i, frame in enumerate(eval_episode.frames, 1):
+            messages[1]["content"].extend(
+                [
+                    {"type": "text", "text": f"Frame {i}: "},
+                    {"type": "image", "base64": self.encode_image(frame)}
+                ]
+            )
 
         inputs = self.processor.apply_chat_template(
-            messages, padding=True, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt"
+            messages, 
+            padding=True, 
+            add_generation_prompt=True, 
+            tokenize=True, 
+            return_dict=True, 
+            return_tensors="pt"
         ).to(self.model.device)
 
-        output = self.model.generate(**inputs, max_new_tokens=400)
+        output = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
         decoded_outputs = self.processor.batch_decode(output, skip_special_tokens=True)
         return decoded_outputs[0]
 
@@ -291,44 +335,43 @@ class GeminiClient(BaseModelClient):
         if genai is None:
             raise ImportError("Google GenAI package not installed")
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        self.model_name = "gemini-2.5-flash"
 
     def generate_response(
         self,
         prompt: str,
-        image_paths: List[str],
-        task_description: str,
-        example_indices: List[int],
-        total_frames: int,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
     ) -> str:
 
-        # Build contents following GPT4o structure
         contents = [prompt]
 
         # Add initial scene
         contents.append("Initial robot scene:")
-        with open(image_paths[0], "rb") as f:
-            contents.append(types.Part.from_bytes(data=f.read(), mime_type="image/png"))
+        contents.append(types.Part.from_bytes(data=self.encode_image(eval_episode.starting_frame), mime_type="image/png"))
         contents.append("In the initial robot scene, the task completion percentage is 0.")
 
         # Add example images with completion percentages
-        for i, (idx, path) in enumerate(zip(example_indices, image_paths[:4])):
-            contents.append(f"Example {i+1}:")
-            with open(path, "rb") as f:
-                contents.append(types.Part.from_bytes(data=f.read(), mime_type="image/png"))
-            contents.append(f"Task Completion Percentage: {idx/total_frames*100:.1f}%")
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
+            contents.append(f"Example episode {ctx_episode_idx+1}.")
+            contents.append(f"Instruction: {context_episode.instruction}")
+            
+            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                contents.append(f"Frame {i+1}: ")
+                contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
+                contents.append(f"Task Completion Percentage: {task_completion:.1f}%")
 
         # Add query instruction
         contents.append(
-            f"Now, for the task of {task_description}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%"
+            f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%"
         )
 
         # Add query images
-        for i, path in enumerate(image_paths[4:], 1):
-            contents.append(f"Frame {i}:")
-            with open(path, "rb") as f:
-                contents.append(types.Part.from_bytes(data=f.read(), mime_type="image/png"))
+        for i, frame in enumerate(eval_episode.frames, 1):
+            contents.append(f"Frame {i}: ")
+            contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
 
-        response = self.client.models.generate_content(model="gemini-2.5-flash", contents=contents)
+        response = self.client.models.generate_content(model=self.model_name, contents=contents)
         return response.text
 
 

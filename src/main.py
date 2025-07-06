@@ -1,31 +1,24 @@
 """ Example script to produce GVL predictions.
 
-Script to load OXE (Open X-Embodiment) robotics data and feed random images
-to a task completion percentage prediction prompt.
-
-Download dataset:
-gsutil -m cp -r gs://gresearch/robotics/fmb ~/tensorflow_datasets/
-
 Run:
-python src/main.py --name fmb:0.0.1 --max_frames 4 --model gpt4o
+    python src/main.py --name lerobot/fmb --max_frames 4 --model internvl
 """
 
 from __future__ import annotations
 
 import argparse
-
+import utils
 from data_loader import DataLoader
 from models import ModelFactory
 from voc_score import parse_response, value_order_correlation
 
 
-def main(
+def run_eval(
         name: str,
-        num_eval_steps: int = 5,
-        max_frames: int = 10, 
-        num_context_frames: int = 4, 
         model: str = "gpt4o",
         num_context_episodes: int = 2,
+        max_frames: int = 10,
+        num_eval_steps: int = 5,
         camera_index: int = 0,
     ):
     """Main function to run the data loading and prompt generation."""
@@ -39,58 +32,53 @@ def main(
 
     client = ModelFactory.create_client(model)
 
-    for eval_step in range(num_eval_steps):
+    for _ in range(num_eval_steps):
         example = loader.load_example()
 
-        # Save images to files
-        image_paths = loader.save_images_to_files(selected_images)
-
-        # Generate response using selected model
         print(f"\nSending to {model}...")
-        try:
-            prompt = f"""You are an expert roboticist tasked to predict task completion
-            percentages for frames of a robot for the task of {example.instructions[0]}.
-            The task completion percentages are between 0 and 100, where 100
-            corresponds to full task completion. We provide several examples of
-            the robot performing the task at various stages and their
-            corresponding task completion percentages. Note that these frames are
-            in random order, so please pay attention to the individual frames
-            when reasoning about task completion percentage."""
-            response = client.generate_response(
-                prompt=prompt,
-                image_paths=image_paths,
-                task_description=task_description,
-                example_indices=selected_indices[:num_context_frames],
-                total_frames=total_frames,
-                num_context_frames=num_context_frames,
-            )
+        
+        # try:
+        prompt = utils.get_prompt(example.eval_episode.instruction)
+        response = client.generate_response(
+            prompt=prompt,
+            eval_episode=example.eval_episode,
+            context_episodes=example.context_episodes,
+        )
 
-            print("\n" + "=" * 80)
-            print(f"{model.upper()} RESPONSE:")
-            print("=" * 80)
-            print(response)
-            print("=" * 80)
+        print("\n" + "=" * 80)
+        print(f"{model.upper()} RESPONSE:")
+        print("=" * 80) 
+        print(response)
+        print("=" * 80)
+        print("\nGround Truth Completion Percentages:")
+        for i, completion in enumerate(example.eval_episode.task_completion_predictions):
+            print(f"Frame {i+1} (step {i}): {completion:.1f}%")
 
-            print("\nGround Truth Completion Percentages:")
-            for i, idx in enumerate(selected_indices[num_context_frames:]):
-                completion = idx / total_frames * 100
-                print(f"Frame {i+1} (step {idx}): {completion:.1f}%")
+        print(f"VOC: {value_order_correlation(parse_response(response), example.eval_episode.task_completion_predictions)}")
 
-            print(f"VOC: {value_order_correlation(parse_response(response), selected_indices[num_context_frames:])}")
-
-        except Exception as e:
-            print(f"Error generating response: {e}")
-
-        break
-
-    print(f"\nImages saved in: {loader.image_dir}")
+        # except Exception as e:
+        #     print(f"Error generating response: {e}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--name", type=str, default="fmb:0.0.1", help="Dataset name")
-    parser.add_argument("--max_frames", type=int, default=10, help="Maximum number of frames to select")
-    parser.add_argument("--num_context_frames", type=int, default=4, help="Number of context frames to use")
+    parser.add_argument("--name", type=str, default="lerobot/fmb", help="Dataset name")
+    parser.add_argument(
+        "--max_frames", 
+        type=int, default=10, 
+        help="Maximum number of frames to select per episode"
+    )
+    parser.add_argument(
+        "--num_eval_steps", 
+        type=int, 
+        default=5, 
+        help="Number of evaluation steps to run"
+    )
+    parser.add_argument(
+        "--num_context_episodes", 
+        type=int, 
+        default=2, help="Number of context episodes to use"
+    )
     parser.add_argument(
         "--model",
         type=str,
@@ -98,5 +86,18 @@ if __name__ == "__main__":
         choices=["gpt4o", "internvl", "gemma", "gemini"],
         help="Model to use for inference",
     )
+    parser.add_argument(
+        "--camera_index",
+        type=int,
+        default=0,
+        help="Camera index to use",
+    )
     args = parser.parse_args()
-    main(args.name, args.max_frames, args.num_context_frames, args.model)
+    run_eval(
+        args.name, 
+        args.model,
+        args.num_context_episodes, 
+        args.max_frames, 
+        args.num_eval_steps,
+        args.camera_index,
+    )

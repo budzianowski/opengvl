@@ -1,25 +1,26 @@
-from __future__ import annotations
+""" Value-Order Correlation (VOC) score """
 
-import numpy as np
-from scipy.stats import spearmanr
 import re
 
+from scipy.stats import spearmanr
 
-def value_order_correlation(values: list[int], time_order: list[int]):
+
+def value_order_correlation(values: list[int], true_values: list[int]):
     """
     Computes the Value-Order Correlation (VOC) for a sequence of predicted values.
 
     Args:
         values (list or np.ndarray): Sequence of predicted values v_1, ..., v_T.
         the values are between 0 and 100
-        time_order (list or np.ndarray): Sequence of time indices t_1, ..., t_T.
+        true_values (list or np.ndarray): Sequence of true values t_1, ..., t_T.
     Returns:
         float: Spearman rank correlation coefficient between the predicted value order
                and the chronological order.
     """
-    time_order_values = [values[i] for i in time_order]
-    T = len(values)
-    voc, _ = spearmanr(time_order_values, np.arange(T))
+    if len(values) != len(true_values):
+        raise ValueError("values and true_values must have the same length")
+    
+    voc, _ = spearmanr(values, true_values)
     return voc
 
 
@@ -51,12 +52,12 @@ def parse_response(response: str) -> list[int]:
     These predictions are based on observed stages of picking up and inserting the object, in alignment with given examples.
     """
     # Pattern to match task completion percentages
-    completion_pattern = r'(?:Task Completion|Completion).*?(\d+(?:\.\d+)?)%'
-    
+    completion_pattern = r"(?:Task Completion|Completion).*?(\d+(?:\.\d+)?)%"
+
     # Find all completion percentages
     matches = re.findall(completion_pattern, response, re.IGNORECASE)
-    
+
     # Convert to integers (round float values)
     values = [int(float(match)) for match in matches]
-    
+
     return values

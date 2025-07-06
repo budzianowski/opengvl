@@ -20,7 +20,7 @@ uv run src/main.py --name fmb:0.0.1 --max_frames 30 --model gpt4o
 # TODO:
 1. Fix logic
 2. Add reward awr for the algorithm for the lerobot as input
-3. 
+3. Adding compatibility to: https://github.com/open-compass/VLMEvalKit
 
 
 # Acknowledgements
