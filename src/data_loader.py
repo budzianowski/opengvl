@@ -13,19 +13,16 @@ import argparse
 class Episode:
     instruction: str
     episode_indices: list[int]
-    original_frames_indices: list[list[int]]
-    shuffled_frames_indices: list[list[int]]
-    task_completion_predictions: list[list[int]]
-    frames: list[list[np.ndarray]]
+    original_frames_indices: list[int]
+    shuffled_frames_indices: list[int]
+    task_completion_predictions: list[int]
+    frames: list[np.ndarray]
+
 
 @dataclass
 class Example:
-    instructions: list[str]
-    episode_indices: list[int]
-    original_frames_indices: list[list[int]]
-    shuffled_frames_indices: list[list[int]]
-    task_completion_predictions: list[list[int]]
-    frames: list[list[np.ndarray]]
+    eval_episodes: Episode
+    context_episodes: list[Episode]
 
 
 class DataLoader:
@@ -61,12 +58,7 @@ class DataLoader:
 
         camera_key = dataset.meta.camera_keys[self.camera_index]
 
-        task_completion_predictions = []
-        original_frames_indices = []
-        shuffled_frames_indices = []
-        all_frames = []
-        instructions = []
-
+        episodes = []
         for idx in range(len(dataset.episode_data_index["from"])):
             from_idx = dataset.episode_data_index["from"][idx].item()
             to_idx = dataset.episode_data_index["to"][idx].item()
@@ -80,40 +72,46 @@ class DataLoader:
             shuffled_indices = np.random.permutation(len(context_frames_indices))
             shuffled_frames = [selected_frames[i] for i in shuffled_indices]
 
-            # Save the original and new indices
-            original_frames_indices.append(context_frames_indices.tolist())
-            shuffled_frames_indices.append(shuffled_indices.tolist())
-            task_completion_predictions.append(completion_prediction.tolist())
-            all_frames.append(shuffled_frames)
+            episode = Episode(
+                instruction=dataset[from_idx]["task"],
+                episode_indices=[episode_indices[idx]],
+                original_frames_indices=context_frames_indices.tolist(),
+                shuffled_frames_indices=shuffled_indices.tolist(),
+                task_completion_predictions=completion_prediction.tolist(),
+                frames=shuffled_frames
+            )
+            episodes.append(episode)
 
-            # all episode indices have the same task
-            instructions.append(dataset[from_idx]["task"])
+        # First episode is eval, rest are context
+        eval_episode = episodes[0]
+        context_episodes = episodes[1:]
 
         return Example(
-            instructions=instructions,
-            episode_indices=episode_indices,
-            original_frames_indices=original_frames_indices,
-            shuffled_frames_indices=shuffled_frames_indices,
-            frames=all_frames,
-            task_completion_predictions=task_completion_predictions,
+            eval_episodes=eval_episode,
+            context_episodes=context_episodes
         )
 
-    def plot_single_episode(self, example: Example, episode_idx: int = 0):
+    def plot_single_episode(self, example: Example, episode_idx: int = 0, plot_eval: bool = True):
         """Plot a single episode from the Example structure with task completion graph
         
         Args:
             example: Example structure containing episodes data
-            episode_idx: Index of episode to plot (default: 0)
+            episode_idx: Index of episode to plot (default: 0, only used for context episodes)
+            plot_eval: If True, plot eval episode; if False, plot context episode at episode_idx
         """
-        if episode_idx >= len(example.frames):
-            print(f"Episode index {episode_idx} out of range. Available episodes: {len(example.frames)}")
-            return
+        if plot_eval:
+            episode = example.eval_episodes
+        else:
+            if episode_idx >= len(example.context_episodes):
+                print(f"Episode index {episode_idx} out of range. Available context episodes: {len(example.context_episodes)}")
+                return
+            episode = example.context_episodes[episode_idx]
         
-        frames = example.frames[episode_idx]
-        instruction = example.instructions[episode_idx]
-        original_indices = example.original_frames_indices[episode_idx]
-        shuffled_indices = example.shuffled_frames_indices[episode_idx]
-        completion_preds = example.task_completion_predictions[episode_idx]
+        frames = episode.frames
+        instruction = episode.instruction
+        original_indices = episode.original_frames_indices
+        shuffled_indices = episode.shuffled_frames_indices
+        completion_preds = episode.task_completion_predictions
         
         # Create figure with subplots for frames and completion graph
         num_frames = len(frames)
@@ -126,7 +124,8 @@ class DataLoader:
         # Create gridspec for layout
         gs = fig.add_gridspec(rows + 1, cols, height_ratios=[1] * rows + [0.8], hspace=0.3)
         
-        fig.suptitle(f"Episode {example.episode_indices[episode_idx]}: {instruction}", 
+        episode_id = episode.episode_indices[0] if episode.episode_indices else "Unknown"
+        fig.suptitle(f"Episode {episode_id}: {instruction}", 
                     fontsize=16, fontweight='bold')
         
         # Plot frames
@@ -205,7 +204,6 @@ if __name__ == "__main__":
         num_frames=args.num_frames,
         camera_index=args.camera_index
     )
-    
 
     example = loader.load_example()
     loader.plot_single_episode(example, episode_idx=0)
