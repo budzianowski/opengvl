@@ -1,88 +1,103 @@
-""" Data loader for the OXE dataset. """
-
+""" Data loader utilities """
 from __future__ import annotations
 
-import os
-import random
-from typing import List, Tuple
+from dataclasses import dataclass
 
 import numpy as np
-import tensorflow as tf
-import tensorflow_datasets as tfds
-from PIL import Image
+from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 
 
-class OXEDataLoader:
-    """Loads and processes OXE robotics dataset for task completion analysis."""
+@dataclass
+class Example:
+    instructions: list[str]
+    episode_indices: list[int]
+    original_frames_indices: list[list[int]]
 
-    def __init__(self, dataset_name: str = "bridge:0.1.0"):
-        """
-        Initialize the OXE data loader.
+    task_completion_predictions: list[int]
+    shuffled_frames_indices: list[list[int]]
+
+    frames: list[list[np.ndarray]]
+
+
+class DataLoader:
+    def __init__(
+        self, dataset_name: str, 
+        num_context_episodes: int = 2, 
+        num_frames: int = 10,
+        camera_index: int = 0,
+    ):
+        """Wrapper around LeRobotDataset to load examples from the dataset.
 
         Args:
-            dataset_name: Name of the OXE dataset (e.g., "bridge:0.1.0", "fractal20220817_data")
+            dataset_name: name of the dataset to load
+            num_context_episodes: number of episodes to use as context
+            num_context_frames: number of frames to use as context
         """
+        self.ds_meta = LeRobotDatasetMetadata(dataset_name)
         self.dataset_name = dataset_name
-        self.image_dir = os.path.join(os.getcwd(), "images")
-        os.makedirs(self.image_dir, exist_ok=True)
+        self.cache_episode = np.arange(self.ds_meta.total_episodes)
+        self.num_context_episodes = num_context_episodes
+        self.camera_index = camera_index
+        self.num_frames = num_frames
+    
+    def load_example(self):
+        """From available episdoes choose num_context+1 episodes. Remove these indices from cache_episode"""
+        episode_indices = np.random.choice(
+            self.cache_episode, self.num_context_episodes + 1, replace=False)
+        self.cache_episode = np.setdiff1d(self.cache_episode, episode_indices)
+        dataset = LeRobotDataset(self.dataset_name, episodes=episode_indices)
 
-    def load_dataset(self, split: str = "train") -> tf.data.Dataset:
-        """Load the OXE dataset."""
-        try:
-            ds = tfds.load(
-                self.dataset_name,
-                split=split,
-                shuffle_files=False,
-            )
-            return ds
-        except Exception as e:
-            print(f"Error loading {self.dataset_name}: {e}")
-            raise e
+        # Then we grab all the image frames from the first camera:
+        camera_key = dataset.meta.camera_keys[self.camera_index]
 
-    def extract_episode_images(self, episode) -> List[np.ndarray]:
-        """Extract images from a single episode."""
-        try:
-            images = []
-            instr = episode["episode_metadata"]["episode_language_instruction"]
-            instr_str = instr.numpy().decode("utf-8")
-            for step in episode["steps"]:
-                images.append(step["observation"]["image_side_1"])
-            return images, instr_str
-        except Exception as e:
-            print(f"Error extracting images: {e}")
-            return []
+        task_completion_predictions = []
+        original_frames_indices = []
+        shuffled_frames_indices = []
+        all_frames = []
+        instructions = []
 
-    def save_images_to_files(self, images: List[np.ndarray], prefix: str = "frame") -> List[str]:
-        """Save images to files and return file paths."""
-        file_paths = []
-        for i, img in enumerate(images):
-            # Convert tensor to numpy if needed
-            if isinstance(img, tf.Tensor):
-                img = img.numpy()
+        for idx in range(len(dataset.episode_data_index["from"])):
+            from_idx = dataset.episode_data_index["from"][idx].item()
+            to_idx = dataset.episode_data_index["to"][idx].item()
+            frames = [dataset[index][camera_key] for index in range(from_idx, to_idx)]
 
-            # Ensure image is in correct format
-            if img.dtype != np.uint8:
-                img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
+            # instructions.append(dataset.episode_data["instruction"][idx])
+            context_frames_indices = np.random.choice(range(len(frames)), self.num_frames, replace=False)
+            completion_prediction = (context_frames_indices / len(frames) * 100).astype(int)
+            selected_frames = [frames[i] for i in context_frames_indices]
+            
+            # shuffle chosen frames
+            shuffled_indices = np.random.permutation(len(context_frames_indices))
+            shuffled_frames = [selected_frames[i] for i in shuffled_indices]
 
-            # Save image
-            filename = f"{prefix}_{i}.png"
-            filepath = os.path.join(self.image_dir, filename)
+            # Save the original and new indices
+            original_frames_indices.append(context_frames_indices.tolist())
+            shuffled_frames_indices.append(shuffled_indices.tolist())
+            task_completion_predictions.append(completion_prediction.tolist())
+            all_frames.append(shuffled_frames)
 
-            pil_img = Image.fromarray(img)
-            pil_img.save(filepath)
-            file_paths.append(filepath)
+        breakpoint()
+        return Example(
+            # TODO meta.tasks
+            # instructions=instructions,
+            original_episode_indices=episode_indices,
+            original_frames_indices=original_frames_indices,
+            shuffled_frames_indices=shuffled_frames_indices,
+            frames=all_frames,
+            task_completion_predictions=task_completion_predictions,
+        )
 
-        return file_paths
+    def plot_example(self, dataset: LeRobotDataset):
+        """Plot the example"""
+        breakpoint()
+        # TODO: plot the example
+        pass
 
-    def select_random_frames(self, images: List[np.ndarray], n_frames: int = 3) -> Tuple[List[np.ndarray], List[int]]:
-        """Select random frames from the episode."""
-        if len(images) < n_frames:
-            # If not enough images, use all available
-            selected_images = images
-            indices = list(range(len(images)))
-        else:
-            # Randomly sample frames
-            indices = sorted(random.sample(range(len(images)), n_frames))
-            selected_images = [images[i] for i in indices]
 
-        return selected_images, indices, len(images)
+if __name__ == "__main__":
+    loader = DataLoader(dataset_name="lerobot/fmb", num_context_episodes=2, num_frames=4)
+    example = loader.load_example()
+    breakpoint()
+    loader.plot_example(example)
+
+    # loader.plot_example(example)
