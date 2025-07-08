@@ -7,7 +7,7 @@ from typing import List
 from data_loader import Episode
 import numpy as np
 import torch
-from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM
+from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM, AutoTokenizer
 import io
 from PIL import Image
 # third-party imports
@@ -164,7 +164,7 @@ class InternVLClient(BaseModelClient):
         self.processor = AutoProcessor.from_pretrained(model_checkpoint)
         self.model = AutoModelForImageTextToText.from_pretrained(
             model_checkpoint, device_map=self.device, torch_dtype=torch.bfloat16
-        )
+        ).eval()
 
     def generate_response(
         self,
@@ -250,7 +250,7 @@ class GemmaClient(BaseModelClient):
 
         model_id = "google/gemma-3-1b-it"
         self.model = Gemma3ForCausalLM.from_pretrained(model_id, device_map="auto").eval()
-        self.processor = AutoProcessor.from_pretrained(model_id)
+        self.processor = AutoTokenizer.from_pretrained(model_id)
 
     def generate_response(
         self,
