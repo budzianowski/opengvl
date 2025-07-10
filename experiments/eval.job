@@ -2,7 +2,7 @@
 #SBATCH --job-name=gvl-eval
 #SBATCH --output=gvl-eval-%j.out
 #SBATCH --error=gvl-eval-%j.err
-#SBATCH --time=08:00:00
+#SBATCH --time=01:00:00
 #SBATCH --account=plgopenglv-gpu-a100
 #SBATCH --partition=plgrid-gpu-a100
 #SBATCH --cpus-per-task=4
@@ -22,4 +22,4 @@ eval "$(conda shell.bash hook)"
 conda activate gvl_cuda
 
 # Run the command
-python src/main.py --name lerobot/fmb --max_frames 4 --model internvl
+python src/main.py --name lerobot/fmb --max_frames 10 --model internvl
