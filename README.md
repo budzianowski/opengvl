@@ -48,15 +48,19 @@ conda activate gvl_cuda
 
 git clone git@github.com:budzianowski/opengvl.git
 cd opengvl
-pip install -r requirements.txt
-
+# pip install -r requirements.txt
 # cd .. && git clone https://github.com/huggingface/lerobot.git && cd lerobot && pip install -e . && cd ../opengvl
 ```
 
 # Run open source version
 
 ```bash
-python src/main.py --name lerobot/fmb --max_frames 1 --model gpt4o
+python src/main.py --name lerobot/fmb --max_frames 1 --model internvl
+```
+## HPC
+
+```bash
+sbatch experiments/eval.job
 ```
 
 # Current leaderboard
