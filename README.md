@@ -25,24 +25,38 @@ cd .. && git clone https://github.com/huggingface/lerobot.git && cd lerobot && u
 export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
 export UV_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/
 export CONDA_PKGS_DIRS=/net/pr2/projects/plgrid/plggrobovlm/conda_pkgs
+export PIP_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/pip_cache
 
 module load Miniconda3
 eval "$(conda shell.bash hook)"
-conda create -n gvl python=3.11 -y
-conda activate gvl
-conda install -c conda-forge scipy tensorflow pytorch torchvision ffmpeg -y
+
+# Temporary
+conda config --add envs_dirs /net/pr2/projects/plgrid/plggrobovlm/conda/envs
+conda config --add pkgs_dirs /net/pr2/projects/plgrid/plggrobovlm/conda/pkgs
+
+# # Create the directory structure
+# mkdir -p /net/pr2/projects/plgrid/plggrobovlm/conda/envs
+# mkdir -p /net/pr2/projects/plgrid/plggrobovlm/conda/pkgs
+
+# # Create new environment in the desired location
+# conda create -p /net/pr2/projects/plgrid/plggrobovlm/conda/envs/gvl_cuda python=3.11 -y
+
+# conda create -n gvl_cuda python=3.11 -y
+conda activate gvl_cuda
+# conda install -c conda-forge ffmpeg -y
+# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
 git clone git@github.com:budzianowski/opengvl.git
 cd opengvl
 pip install -r requirements.txt
 
-cd .. && git clone https://github.com/huggingface/lerobot.git && cd lerobot && pip install -e . && cd ../opengvl
+# cd .. && git clone https://github.com/huggingface/lerobot.git && cd lerobot && pip install -e . && cd ../opengvl
 ```
 
 # Run open source version
 
 ```bash
-uv run src/main.py --name fmb:0.0.1 --max_frames 30 --model gpt4o
+python src/main.py --name lerobot/fmb --max_frames 1 --model gpt4o
 ```
 
 # Current leaderboard

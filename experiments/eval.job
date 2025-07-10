@@ -13,11 +13,13 @@
 export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
 export UV_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/
 export CONDA_PKGS_DIRS=/net/pr2/projects/plgrid/plggrobovlm/conda_pkgs
+export PIP_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/pip_cache
+
 
 # Activate virtual environment assuming the job is submitted from the root of the opengvl directory.
 module load Miniconda3
 eval "$(conda shell.bash hook)"
-conda activate gvl
+conda activate gvl_cuda
 
 # Run the command
 python src/main.py --name lerobot/fmb --max_frames 4 --model internvl

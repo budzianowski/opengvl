@@ -193,7 +193,9 @@ class DataLoader:
 
 
 if __name__ == "__main__":
+    # python src/data_loader.py --dataset_name lerobot/fmb --num_context_episodes 2 --num_frames 15 --camera_index 0
     parser = argparse.ArgumentParser()
+    # lerobot/fmb, lerobot/utaustin_mutex, lerobot/toto
     parser.add_argument("--dataset_name", type=str, default="lerobot/fmb")
     parser.add_argument("--num_context_episodes", type=int, default=2)
     parser.add_argument("--num_frames", type=int, default=15)
