@@ -18,7 +18,7 @@ uv sync
 cd ..
 git clone https://github.com/huggingface/lerobot.git
 cd lerobot
-pip install -e .
+uv pip install -e .
 cd ../opengvl
 ```
 
