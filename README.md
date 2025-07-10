@@ -9,7 +9,17 @@ We held hiddent test set that we evaluate internally to prevent from contaminati
 ```bash
 git clone git@github.com:budzianowski/opengvl.git
 cd opengvl
-uv sync --dev
+uv venv
+source .venv/bin/activate
+export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
+export UV_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/
+
+uv sync
+cd ..
+git clone https://github.com/huggingface/lerobot.git
+cd lerobot
+pip install -e .
+cd ../opengvl
 ```
 
 # Run open source version

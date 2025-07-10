@@ -18,7 +18,6 @@ dependencies = [
     "scipy>=1.16.0",
     "tensorflow>=2.19.0",
     "tensorflow-datasets>=4.9.9",
-    "lerobot @ git+https://github.com/huggingface/lerobot.git@main",
     "tfds>=0.3",
     "torch>=2.7.1",
     "torchvision>=0.22.1",
