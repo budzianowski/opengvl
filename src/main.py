@@ -16,6 +16,22 @@ from data_loader import DataLoader
 from models import ModelFactory
 from voc_score import parse_response, value_order_correlation
 from result_evaluator import ResultEvaluator
+import numpy as np
+
+
+def convert_numpy_types(obj):
+    """Convert numpy types to native Python types for JSON serialization"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    return obj
 
 
 class ResultCollector:
@@ -115,7 +131,8 @@ class ResultCollector:
     def _save_result(self, result: Dict[str, Any]):
         """Append single result to JSONL file"""
         with open(self.results_file, 'a') as f:
-            f.write(json.dumps(result) + '\n')
+            serializable_result = convert_numpy_types(result)
+            f.write(json.dumps(serializable_result) + '\n')
     
     def _save_summary(self):
         """Save experiment summary and config"""
@@ -198,43 +215,44 @@ def run_eval(
 
     for step in range(start_step, num_eval_steps):
 
-        try:
-            example = loader.load_example()
+        # try:
+        example = loader.load_example()
 
-            prompt = utils.get_prompt(example.eval_episode.instruction)
-            response = client.generate_response(
-                prompt=prompt,
-                eval_episode=example.eval_episode,
-                context_episodes=example.context_episodes,
+        prompt = utils.get_prompt(example.eval_episode.instruction)
+        response = client.generate_response(
+            prompt=prompt,
+            eval_episode=example.eval_episode,
+            context_episodes=example.context_episodes,
+        )
+
+        extracted_percentages = result_evaluator.evaluate(response)
+        voc_score_extracted = None
+        if extracted_percentages and len(extracted_percentages) == len(example.eval_episode.task_completion_predictions):
+            voc_score_extracted = value_order_correlation(
+                extracted_percentages, 
+                example.eval_episode.task_completion_predictions,
             )
 
-            extracted_percentages = result_evaluator.evaluate(response)
-            if extracted_percentages and len(extracted_percentages) == len(example.eval_episode.task_completion_predictions):
-                voc_score_extracted = value_order_correlation(
-                    extracted_percentages, 
-                    example.eval_episode.task_completion_predictions,
-                )
-
-            collector.add_result(
-                step=step + 1,
-                example=example,
-                model_response=response,
-                voc_score=voc_score_extracted,
-                extracted_percentages=extracted_percentages,
-                model_name=model
-            )
-            
-        except Exception as e:
-            error_result = {
-                "step": step + 1,
-                "timestamp": datetime.now().isoformat(),
-                "model": model,
-                "error": str(e),
-                "status": "failed"
-            }
-            with open(collector.results_file, 'a') as f:
-                f.write(json.dumps(error_result) + '\n')
-            continue
+        collector.add_result(
+            step=step + 1,
+            example=example,
+            model_response=response,
+            voc_score=voc_score_extracted,
+            extracted_percentages=extracted_percentages,
+            model_name=model
+        )
+        
+    # except Exception as e:
+    #     error_result = {
+    #         "step": step + 1,
+    #         "timestamp": datetime.now().isoformat(),
+    #         "model": model,
+    #         "error": str(e),
+    #         "status": "failed"
+    #     }
+    #     with open(collector.results_file, 'a') as f:
+    #         f.write(json.dumps(error_result) + '\n')
+    #     continue
 
     return collector.results_file
 
