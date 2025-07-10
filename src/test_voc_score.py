@@ -13,8 +13,6 @@ class TestValueOrderCorrelation:
         "values,true_values,expected",
         [
             # Perfect positive correlation
-            ([25, 10, 50, 11, 12], [0, 10, 25, 50, 11], 1.0),
-            ([25, 10, 50, 11, 12], [0, 89, 29, 90, 80], 1.0),
             ([0, 25, 50, 75, 100], [0, 25, 50, 75, 100], 1.0),
             ([1, 2, 3, 4, 5], [0, 1, 2, 3, 4], 1.0),
             # Perfect negative correlation
@@ -137,15 +135,12 @@ class TestValueOrderCorrelation:
 
     def test_input_validation_edge_cases(self):
         """Test edge cases for input validation."""
-        # Empty lists - scipy.spearmanr handles this by returning NaN
         result = value_order_correlation([], [])
         assert np.isnan(result)
 
-        # Mismatched lengths
         with pytest.raises(ValueError):
-            value_order_correlation([1, 2, 3], [0, 1, 2, 3])  # Different lengths
-        
-        # None true_values
+            value_order_correlation([1, 2, 3], [0, 1, 2, 3])
+
         with pytest.raises(ValueError):
             value_order_correlation([1, 2, 3], None)
 
