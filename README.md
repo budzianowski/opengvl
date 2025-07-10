@@ -7,41 +7,36 @@ We held hiddent test set that we evaluate internally to prevent from contaminati
 ## Setup
 
 ```bash
+export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
+export UV_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/
+export CONDA_PKGS_DIRS=/net/pr2/projects/plgrid/plggrobovlm/conda_pkgs
+
 git clone git@github.com:budzianowski/opengvl.git
 cd opengvl
 uv venv
 source .venv/bin/activate
-export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
-export UV_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/
-export CONDA_PKGS_DIRS=/net/pr2/projects/plgrid/plggrobovlm/conda_pkgs
 uv sync
-cd ..
-git clone https://github.com/huggingface/lerobot.git
-cd lerobot
-uv pip install -e .
-cd ../opengvl
+cd .. && git clone https://github.com/huggingface/lerobot.git && cd lerobot && uv pip install -e . && cd ../opengvl
 ```
 
 ## HPC setup
 
 ```bash
+export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
+export UV_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/
+export CONDA_PKGS_DIRS=/net/pr2/projects/plgrid/plggrobovlm/conda_pkgs
+
+module load Miniconda3
+eval "$(conda shell.bash hook)"
 conda create -n gvl python=3.11 -y
 conda activate gvl
 conda install -c conda-forge scipy tensorflow pytorch torchvision ffmpeg -y
-pip install -r requirements.txt
+
 git clone git@github.com:budzianowski/opengvl.git
 cd opengvl
-uv venv
-source .venv/bin/activate
-export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
-export UV_CACHE_DIR=/net/pr2/projects/plgrid/plggrobovlm/
+pip install -r requirements.txt
 
-uv sync
-cd ..
-git clone https://github.com/huggingface/lerobot.git
-cd lerobot
-uv pip install -e .
-cd ../opengvl
+cd .. && git clone https://github.com/huggingface/lerobot.git && cd lerobot && pip install -e . && cd ../opengvl
 ```
 
 # Run open source version
