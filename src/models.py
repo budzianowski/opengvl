@@ -1,7 +1,7 @@
 """Model clients for the different models."""
 import base64
 import os
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from typing import List
 from data_loader import Episode

@@ -36,7 +36,7 @@ The proper response:
 ### example end ###
 
 Format the response as a list of task completion percentages for each frame. DO NOT ADD ANYTHING ELSE.
-If there is no task completion percentage in the response, you need to return only {ERROR_MESSAGE}.
+If there is no task completion percentages (do not extract percentages from descriptions of the frames) in the response, you need to return only {ERROR_MESSAGE}.
 """
 
 
@@ -49,7 +49,11 @@ class Result:
 
 
 class ResultEvaluator:
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct", max_new_tokens: int = 300):
+    def __init__(
+            self,
+            model_name: str = "Qwen/Qwen2.5-1.5B-Instruct",
+            max_new_tokens: int = 300
+        ):
         self.model_name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name)
@@ -77,7 +81,7 @@ class ResultEvaluator:
 
         new_tokens = outputs[0][input_length:]
         assistant_response = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-        
+
         return self._extract_task_completion_percentage(assistant_response)
     
     def _extract_task_completion_percentage(self, response: str) -> list[float]:

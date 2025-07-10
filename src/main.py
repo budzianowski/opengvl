@@ -4,8 +4,6 @@ Run:
     python src/main.py --name lerobot/fmb --max_frames 4 --model internvl
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -14,7 +12,7 @@ from typing import Dict, Any
 import utils
 from data_loader import DataLoader
 from models import ModelFactory
-from voc_score import parse_response, value_order_correlation
+from voc_score import value_order_correlation
 from result_evaluator import ResultEvaluator
 import numpy as np
 
@@ -84,7 +82,7 @@ class ResultCollector:
             "model": model_name,
             
             "eval_episode": {
-                "episode_indices": example.eval_episode.episode_indices,
+                "episode_index": example.eval_episode.episode_index,
                 "instruction": example.eval_episode.instruction,
                 "original_frames_indices": example.eval_episode.original_frames_indices,
                 "shuffled_frames_indices": example.eval_episode.shuffled_frames_indices,
@@ -93,7 +91,7 @@ class ResultCollector:
             
             "context_episodes": [
                 {
-                    "episode_indices": ctx_ep.episode_indices,
+                    "episode_index": ctx_ep.episode_index,
                     "instruction": ctx_ep.instruction,
                     "original_frames_indices": ctx_ep.original_frames_indices,
                     "shuffled_frames_indices": ctx_ep.shuffled_frames_indices,
@@ -214,7 +212,6 @@ def run_eval(
     result_evaluator = ResultEvaluator()
 
     for step in range(start_step, num_eval_steps):
-
         # try:
         example = loader.load_example()
 
@@ -227,6 +224,7 @@ def run_eval(
 
         extracted_percentages = result_evaluator.evaluate(response)
         voc_score_extracted = None
+
         if extracted_percentages and len(extracted_percentages) == len(example.eval_episode.task_completion_predictions):
             voc_score_extracted = value_order_correlation(
                 extracted_percentages, 

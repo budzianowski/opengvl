@@ -13,7 +13,7 @@ import argparse
 class Episode:
     instruction: str
     starting_frame: np.ndarray
-    episode_indices: list[int]
+    episode_index: int
     original_frames_indices: list[int]
     shuffled_frames_indices: list[int]
     task_completion_predictions: list[int]
@@ -76,7 +76,7 @@ class DataLoader:
             episode = Episode(
                 starting_frame=frames[0],
                 instruction=dataset[from_idx]["task"],
-                episode_indices=[episode_indices[idx]],
+                episode_index=episode_indices[idx],
                 original_frames_indices=context_frames_indices.tolist(),
                 shuffled_frames_indices=shuffled_indices.tolist(),
                 task_completion_predictions=completion_prediction.tolist(),
@@ -126,7 +126,7 @@ class DataLoader:
         # Create gridspec for layout
         gs = fig.add_gridspec(rows + 1, cols, height_ratios=[1] * rows + [0.8], hspace=0.3)
         
-        episode_id = episode.episode_indices[0] if episode.episode_indices else "Unknown"
+        episode_id = episode.episode_index
         fig.suptitle(f"Episode {episode_id}: {instruction}", 
                     fontsize=16, fontweight='bold')
         
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str, default="lerobot/fmb")
     parser.add_argument("--num_context_episodes", type=int, default=2)
-    parser.add_argument("--num_frames", type=int, default=4)
+    parser.add_argument("--num_frames", type=int, default=15)
     parser.add_argument("--camera_index", type=int, default=0)
     args = parser.parse_args()
     

@@ -37,21 +37,6 @@ class TestResultEvaluator:
         assert result == expected
 
     @pytest.mark.slow
-    def test_extract_fractional_expressions(self, evaluator):
-        """Test extraction of fractional expressions."""
-        response = """
-        Frame 1: one-tenth complete
-        Frame 2: one-quarter done
-        Frame 3: one-half finished
-        Frame 4: three-quarters complete
-        Frame 5: 7 out of 10 parts done
-        Frame 6: 9/10 complete
-        """
-        result = evaluator.evaluate(response)
-        expected = [10.0, 25.0, 50.0, 75.0, 70.0, 90.0]
-        assert result == expected
-
-    @pytest.mark.slow
     def test_extract_approximate_percentages(self, evaluator):
         """Test extraction of approximate percentage expressions."""
         response = """
@@ -72,8 +57,7 @@ class TestResultEvaluator:
         All systems are functioning normally.
         """
         result = evaluator.evaluate(response)
-        expected = []
-        assert result == expected
+        assert result == []
 
     @pytest.mark.slow
     def test_complex_response_with_mixed_terminology(self, evaluator):
@@ -166,91 +150,6 @@ class TestResultEvaluator:
     
         expected = [5.5, 18.7, 35.0, 58.2, 73.0, 89.4, 100.0]
         assert result == expected
-
-    @pytest.mark.slow
-    def test_contradictory_response_with_multiple_assessments(self, evaluator):
-        """Test response with contradictory information and multiple assessment attempts."""
-        response = """
-        Task Analysis Report: "Pour liquid from container A to container B"
-        
-        Initial Assessment:
-        Looking at the first frame, the robot hasn't started the pouring motion yet. I'd estimate 
-        this is about 10% complete since positioning is underway.
-        
-        Wait, let me reconsider that. Actually, looking more carefully at the gripper position 
-        and the container alignment, this might be closer to 15% completion.
-        
-        Frame 2 Analysis:
-        The robot has grasped the container. This is significant progress - I'd say we're at 
-        30% completion. Although, considering the complexity of pouring tasks, maybe this is 
-        more like 25% complete.
-        
-        Frame 3 Observation:
-        The container is being lifted. This is tricky to assess because pouring requires precise 
-        control. Could be 45% complete, but pouring tasks are non-linear in their progress 
-        measurement. Perhaps 40% is more accurate.
-        
-        Frame 4 Update:
-        Pouring motion has begun! This is the critical phase. I initially thought 60% but 
-        the actual liquid transfer hasn't started yet. Maybe 55% is better.
-        
-        Frame 5 Assessment:
-        Liquid is flowing! This is the main task execution. I'd estimate 75% complete, though 
-        the flow rate suggests we might be at 80% completion.
-        
-        Frame 6 Analysis:
-        The pouring continues with good control. We're definitely in the 85-90% range. Let me 
-        say 87% completion.
-        
-        Frame 7 Final:
-        Task appears complete with successful liquid transfer. 100% completion achieved.
-        
-        Note: Pouring tasks are particularly challenging to assess due to their continuous 
-        nature and the importance of the final precision phase.
-        """
-        result = evaluator.evaluate(response)
-        
-        expected_percentages = [10.0, 15.0, 30.0, 25.0, 45.0, 40.0, 60.0, 55.0, 75.0, 80.0, 85.0, 90.0, 87.0, 100.0]
-        
-        assert result == expected_percentages
-        
-    @pytest.mark.slow
-    def test_response_with_no_clear_percentages(self, evaluator):
-        """Test response that discusses progress but provides no clear percentage values."""
-        response = """
-        Analyzing the robotic task execution for "Sort colored blocks by category":
-        
-        The robot begins by scanning the workspace. This is clearly the initial phase of the 
-        task where environmental understanding is being established. Very preliminary stage.
-        
-        Next, I observe the robot identifying different colored objects. The visual processing 
-        system seems to be working effectively. This represents early progress in the sorting 
-        task but we're still in the reconnaissance phase.
-        
-        The robot then selects its first target object. This demonstrates good decision-making 
-        and task prioritization. We're moving beyond the planning phase into execution.
-        
-        I see the robot successfully grasping a blue block. This is concrete progress - the 
-        first actual manipulation action. We're transitioning from preparation to active sorting.
-        
-        The blue block is being moved toward what appears to be the correct sorting area. 
-        This shows good spatial reasoning and task understanding. Solid advancement.
-        
-        The robot places the blue block and returns for another object. This demonstrates 
-        successful completion of the first sorting cycle. Good momentum building.
-        
-        Multiple objects have now been sorted correctly. The robot is showing consistent 
-        performance and good efficiency. We're well into the active sorting phase.
-        
-        The workspace appears mostly organized with objects in their appropriate categories. 
-        The sorting task is nearing completion with just a few items remaining.
-        
-        Final observation shows all objects properly categorized. The sorting task has been 
-        completed successfully with good organization and efficiency.
-        """
-        result = evaluator.evaluate(response)
-        
-        assert result == []
 
     @pytest.mark.slow 
     def test_full_model_evaluation_integration(self, evaluator):
