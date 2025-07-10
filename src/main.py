@@ -212,45 +212,45 @@ def run_eval(
     result_evaluator = ResultEvaluator()
 
     for step in range(start_step, num_eval_steps):
-        # try:
-        example = loader.load_example()
+        try:
+            example = loader.load_example()
 
-        prompt = utils.get_prompt(example.eval_episode.instruction)
-        response = client.generate_response(
-            prompt=prompt,
-            eval_episode=example.eval_episode,
-            context_episodes=example.context_episodes,
-        )
-
-        extracted_percentages = result_evaluator.evaluate(response)
-        voc_score_extracted = None
-
-        if extracted_percentages and len(extracted_percentages) == len(example.eval_episode.task_completion_predictions):
-            voc_score_extracted = value_order_correlation(
-                extracted_percentages, 
-                example.eval_episode.task_completion_predictions,
+            prompt = utils.get_prompt(example.eval_episode.instruction)
+            response = client.generate_response(
+                prompt=prompt,
+                eval_episode=example.eval_episode,
+                context_episodes=example.context_episodes,
             )
 
-        collector.add_result(
-            step=step + 1,
-            example=example,
-            model_response=response,
-            voc_score=voc_score_extracted,
-            extracted_percentages=extracted_percentages,
-            model_name=model
-        )
-        
-    # except Exception as e:
-    #     error_result = {
-    #         "step": step + 1,
-    #         "timestamp": datetime.now().isoformat(),
-    #         "model": model,
-    #         "error": str(e),
-    #         "status": "failed"
-    #     }
-    #     with open(collector.results_file, 'a') as f:
-    #         f.write(json.dumps(error_result) + '\n')
-    #     continue
+            extracted_percentages = result_evaluator.evaluate(response)
+            voc_score_extracted = None
+
+            if extracted_percentages and len(extracted_percentages) == len(example.eval_episode.task_completion_predictions):
+                voc_score_extracted = value_order_correlation(
+                    extracted_percentages, 
+                    example.eval_episode.task_completion_predictions,
+                )
+
+            collector.add_result(
+                step=step + 1,
+                example=example,
+                model_response=response,
+                voc_score=voc_score_extracted,
+                extracted_percentages=extracted_percentages,
+                model_name=model
+            )
+            
+        except Exception as e:
+            error_result = {
+                "step": step + 1,
+                "timestamp": datetime.now().isoformat(),
+                "model": model,
+                "error": str(e),
+                "status": "failed"
+            }
+            with open(collector.results_file, 'a') as f:
+                f.write(json.dumps(error_result) + '\n')
+            continue
 
     return collector.results_file
 
