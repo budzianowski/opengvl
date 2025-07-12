@@ -2,6 +2,7 @@
 
 Run:
     python src/main.py --name lerobot/fmb --max_frames 4 --model internvl
+    python src/main.py --batch_eval --results_file results/experiment_results.jsonl
 """
 
 import argparse
@@ -171,6 +172,27 @@ class ResultCollector:
         return len(self.results)
 
 
+def batch_evaluate_results(results_file: str, output_file: str = None, batch_size: int = 8):
+    """
+    Run batch evaluation on an existing results file.
+    
+    Args:
+        results_file: Path to the JSONL results file
+        output_file: Path to save updated results (if None, overwrites input file)
+        batch_size: Batch size for model inference
+    """
+    if not os.path.exists(results_file):
+        raise FileNotFoundError(f"Results file not found: {results_file}")
+    
+    print(f"Starting batch evaluation of {results_file} with batch size {batch_size}")
+    
+    result_evaluator = ResultEvaluator(batch_size=batch_size)
+    updated_file = result_evaluator.batch_evaluate_jsonl(results_file, output_file)
+    
+    print(f"Batch evaluation completed. Updated file: {updated_file}")
+    return updated_file
+
+
 def run_eval(
         name: str,
         model: str = "gpt4o",
@@ -257,6 +279,31 @@ def run_eval(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    
+    # Batch evaluation mode
+    parser.add_argument(
+        "--batch_eval",
+        action="store_true",
+        help="Run batch evaluation on existing results file"
+    )
+    parser.add_argument(
+        "--results_file",
+        type=str,
+        help="Path to results JSONL file for batch evaluation"
+    )
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        help="Path to save updated results (if not specified, overwrites input file)"
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=8,
+        help="Batch size for model inference during batch evaluation",
+    )
+    
+    # Regular evaluation mode arguments
     parser.add_argument("--name", type=str, default="lerobot/fmb", help="Dataset name")
     parser.add_argument(
         "--max_frames", 
@@ -304,16 +351,22 @@ if __name__ == "__main__":
         action="store_true",
         help="Resume from existing results file",
     )
+    
     args = parser.parse_args()
     
-    run_eval(
-        args.name, 
-        args.model,
-        args.num_context_episodes, 
-        args.max_frames, 
-        args.num_eval_steps,
-        args.camera_index,
-        args.output_dir,
-        args.experiment_name,
-        args.resume,
-    )
+    if args.batch_eval:
+        if not args.results_file:
+            parser.error("--results_file is required when using --batch_eval")
+        batch_evaluate_results(args.results_file, args.output_file, args.batch_size)
+    else:
+        run_eval(
+            args.name, 
+            args.model,
+            args.num_context_episodes, 
+            args.max_frames, 
+            args.num_eval_steps,
+            args.camera_index,
+            args.output_dir,
+            args.experiment_name,
+            args.resume,
+        )
