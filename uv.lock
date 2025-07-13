@@ -1205,7 +1205,7 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.8.1" },
     { name = "google-genai", marker = "extra == 'closed'", specifier = ">=1.22.0" },
     { name = "isort", specifier = ">=6.0.1" },
-    { name = "lerobot", git = "https://github.com/huggingface/lerobot.git?rev=main" },
+    { name = "lerobot", git = "https://github.com/huggingface/lerobot.git?rev=ce2b9724bfe1b5a4c45e61b1890eef3f5ab0909c" },
     { name = "marimo", specifier = ">=0.14.10" },
     { name = "openai", specifier = ">=1.93.0" },
     { name = "openai", marker = "extra == 'closed'", specifier = ">=1.93.0" },
@@ -1680,7 +1680,7 @@ wheels = [
 [[package]]
 name = "lerobot"
 version = "0.1.0"
-source = { git = "https://github.com/huggingface/lerobot.git?rev=main#aec1b29d230341721c8d8f4413c47dcdb424cf5d" }
+source = { git = "https://github.com/huggingface/lerobot.git?rev=ce2b9724bfe1b5a4c45e61b1890eef3f5ab0909c#ce2b9724bfe1b5a4c45e61b1890eef3f5ab0909c" }
 dependencies = [
     { name = "av" },
     { name = "cmake" },

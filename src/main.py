@@ -1,22 +1,21 @@
 """ Example script to produce GVL predictions.
 
 Run:
-    python src/main.py --name lerobot/fmb --max_frames 4 --model internvl
+    python src/main.py --name lerobot/fmb --max_frames 4 --num_context_episodes 2 --model internvl
+    python src/main.py --batch_eval --results_file results/experiment_results.jsonl
 """
-
-from __future__ import annotations
 
 import argparse
 import json
 import os
 from datetime import datetime
-from typing import Dict, Any
+
+import numpy as np
+
 import utils
 from data_loader import DataLoader
 from models import ModelFactory
-from voc_score import parse_response, value_order_correlation
 from result_evaluator import ResultEvaluator
-import numpy as np
 
 
 def convert_numpy_types(obj):
@@ -70,7 +69,7 @@ class ResultCollector:
         }
         self.set_config(self.config)
     
-    def set_config(self, config: Dict[str, Any]):
+    def set_config(self, config: dict[str, any]):
         """Store experiment configuration"""
         self.experiment_config = config
         self._save_summary()
@@ -84,7 +83,7 @@ class ResultCollector:
             "model": model_name,
             
             "eval_episode": {
-                "episode_indices": example.eval_episode.episode_indices,
+                "episode_index": example.eval_episode.episode_index,
                 "instruction": example.eval_episode.instruction,
                 "original_frames_indices": example.eval_episode.original_frames_indices,
                 "shuffled_frames_indices": example.eval_episode.shuffled_frames_indices,
@@ -93,7 +92,7 @@ class ResultCollector:
             
             "context_episodes": [
                 {
-                    "episode_indices": ctx_ep.episode_indices,
+                    "episode_index": ctx_ep.episode_index,
                     "instruction": ctx_ep.instruction,
                     "original_frames_indices": ctx_ep.original_frames_indices,
                     "shuffled_frames_indices": ctx_ep.shuffled_frames_indices,
@@ -128,7 +127,7 @@ class ResultCollector:
         self._save_result(result)
         self._update_summary()
     
-    def _save_result(self, result: Dict[str, Any]):
+    def _save_result(self, result: dict[str, any]):
         """Append single result to JSONL file"""
         with open(self.results_file, 'a') as f:
             serializable_result = convert_numpy_types(result)
@@ -173,6 +172,27 @@ class ResultCollector:
         return len(self.results)
 
 
+def batch_evaluate_results(results_file: str, output_file: str = None, batch_size: int = 8):
+    """
+    Run batch evaluation on an existing results file.
+    
+    Args:
+        results_file: Path to the JSONL results file
+        output_file: Path to save updated results (if None, overwrites input file)
+        batch_size: Batch size for model inference
+    """
+    if not os.path.exists(results_file):
+        raise FileNotFoundError(f"Results file not found: {results_file}")
+    
+    print(f"Starting batch evaluation of {results_file} with batch size {batch_size}")
+    
+    result_evaluator = ResultEvaluator(batch_size=batch_size)
+    updated_file = result_evaluator.batch_evaluate_jsonl(results_file, output_file)
+    
+    print(f"Batch evaluation completed. Updated file: {updated_file}")
+    return updated_file
+
+
 def run_eval(
         name: str,
         model: str = "gpt4o",
@@ -211,54 +231,69 @@ def run_eval(
     )
 
     client = ModelFactory.create_client(model)
-    result_evaluator = ResultEvaluator()
 
     for step in range(start_step, num_eval_steps):
+        try:
+            example = loader.load_example()
 
-        # try:
-        example = loader.load_example()
-
-        prompt = utils.get_prompt(example.eval_episode.instruction)
-        response = client.generate_response(
-            prompt=prompt,
-            eval_episode=example.eval_episode,
-            context_episodes=example.context_episodes,
-        )
-
-        extracted_percentages = result_evaluator.evaluate(response)
-        voc_score_extracted = None
-        if extracted_percentages and len(extracted_percentages) == len(example.eval_episode.task_completion_predictions):
-            voc_score_extracted = value_order_correlation(
-                extracted_percentages, 
-                example.eval_episode.task_completion_predictions,
+            prompt = utils.get_prompt(example.eval_episode.instruction)
+            response = client.generate_response(
+                prompt=prompt,
+                eval_episode=example.eval_episode,
+                context_episodes=example.context_episodes,
             )
 
-        collector.add_result(
-            step=step + 1,
-            example=example,
-            model_response=response,
-            voc_score=voc_score_extracted,
-            extracted_percentages=extracted_percentages,
-            model_name=model
-        )
-        
-    # except Exception as e:
-    #     error_result = {
-    #         "step": step + 1,
-    #         "timestamp": datetime.now().isoformat(),
-    #         "model": model,
-    #         "error": str(e),
-    #         "status": "failed"
-    #     }
-    #     with open(collector.results_file, 'a') as f:
-    #         f.write(json.dumps(error_result) + '\n')
-    #     continue
+            collector.add_result(
+                step=step + 1,
+                example=example,
+                model_response=response,
+                voc_score=None,
+                extracted_percentages=None,
+                model_name=model
+            )
+            
+        except Exception as e:
+            error_result = {
+                "step": step + 1,
+                "timestamp": datetime.now().isoformat(),
+                "model": model,
+                "error": str(e),
+                "status": "failed"
+            }
+            with open(collector.results_file, 'a') as f:
+                f.write(json.dumps(error_result) + '\n')
+            continue
 
     return collector.results_file
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    
+    # Batch evaluation mode
+    parser.add_argument(
+        "--batch_eval",
+        action="store_true",
+        help="Run batch evaluation on existing results file"
+    )
+    parser.add_argument(
+        "--results_file",
+        type=str,
+        help="Path to results JSONL file for batch evaluation"
+    )
+    parser.add_argument(
+        "--output_file",
+        type=str,
+        help="Path to save updated results (if not specified, overwrites input file)"
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=8,
+        help="Batch size for model inference during batch evaluation",
+    )
+    
+    # Regular evaluation mode arguments
     parser.add_argument("--name", type=str, default="lerobot/fmb", help="Dataset name")
     parser.add_argument(
         "--max_frames", 
@@ -306,16 +341,22 @@ if __name__ == "__main__":
         action="store_true",
         help="Resume from existing results file",
     )
+    
     args = parser.parse_args()
     
-    run_eval(
-        args.name, 
-        args.model,
-        args.num_context_episodes, 
-        args.max_frames, 
-        args.num_eval_steps,
-        args.camera_index,
-        args.output_dir,
-        args.experiment_name,
-        args.resume,
-    )
+    if args.batch_eval:
+        if not args.results_file:
+            parser.error("--results_file is required when using --batch_eval")
+        batch_evaluate_results(args.results_file, args.output_file, args.batch_size)
+    else:
+        run_eval(
+            args.name, 
+            args.model,
+            args.num_context_episodes, 
+            args.max_frames, 
+            args.num_eval_steps,
+            args.camera_index,
+            args.output_dir,
+            args.experiment_name,
+            args.resume,
+        )

@@ -1,15 +1,20 @@
 """Model clients for the different models."""
 import base64
+import io
 import os
-from abc import ABC, abstractmethod
-
+from abc import abstractmethod
 from typing import List
-from data_loader import Episode
+
 import numpy as np
 import torch
 from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM, AutoTokenizer, BitsAndBytesConfig, AutoModel, AutoModelForVision2Seq, AutoModelForCausalLM, Qwen2VLForConditionalGeneration
 import io
+
 from PIL import Image
+
+
+from data_loader import Episode
+
 # third-party imports
 try:
     import openai
@@ -181,7 +186,6 @@ class InternVLClient(BaseModelClient):
         eval_episode: Episode,
         context_episodes: List[Episode],
     ) -> str:
-        # Build messages for InternVL following GPT4o structure exactly
         content = [{"type": "text", "text": prompt}]
 
         # Add initial scene
@@ -191,7 +195,7 @@ class InternVLClient(BaseModelClient):
                 {"type": "image", "base64": self.encode_image(eval_episode.starting_frame)},
                 {
                     "type": "text",
-                    "text": "In the initial robot scene, the task completion percentage is 0.",
+                    "text": "In the initial robot scene, the task completion percentage is 0.\n",
                 },
             ]
         )
@@ -200,15 +204,15 @@ class InternVLClient(BaseModelClient):
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
             content.extend(
                 [
-                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
-                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
+                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}.\n"},
+                    {"type": "text", "text": f"Instruction: {context_episode.instruction}\n"},
                 ]
             )
 
             for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
                 content.extend(
                     [
-                        {"type": "text", "text": f"Frame {i+1}: "},
+                        {"type": "text", "text": f"Frame {i+1}: \n"},
                         {"type": "image", "base64": self.encode_image(frame)},
                         {
                             "type": "text",
@@ -221,7 +225,7 @@ class InternVLClient(BaseModelClient):
         content.append(
             {
                 "type": "text",
-                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage (with the format Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%) for the following frames:",
             }
         )
 
@@ -229,7 +233,7 @@ class InternVLClient(BaseModelClient):
         for i, frame in enumerate(eval_episode.frames, 1):
             content.extend(
                 [
-                    {"type": "text", "text": f"Frame {i}: "},
+                    {"type": "text", "text": f"Frame {i}: \n"},
                     {"type": "image", "base64": self.encode_image(frame)},
                 ]
             )
