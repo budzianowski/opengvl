@@ -1,14 +1,16 @@
 """ Result Evaluator """
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
 import json
-from dataclasses import dataclass
-import torch
-import re
-from voc_score import value_order_correlation
 import os
-import tempfile
+import re
 import shutil
+import tempfile
+from dataclasses import dataclass
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from voc_score import value_order_correlation
 
 ERROR_MESSAGE = "No task completion percentage found!!"
 
