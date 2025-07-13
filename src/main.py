@@ -1,7 +1,7 @@
 """ Example script to produce GVL predictions.
 
 Run:
-    python src/main.py --name lerobot/fmb --max_frames 4 --model internvl
+    python src/main.py --name lerobot/fmb --max_frames 4 --num_context_episodes 2 --model internvl
     python src/main.py --batch_eval --results_file results/experiment_results.jsonl
 """
 
@@ -9,13 +9,13 @@ import argparse
 import json
 import os
 from datetime import datetime
-from typing import Dict, Any
+
+import numpy as np
+
 import utils
 from data_loader import DataLoader
 from models import ModelFactory
-from voc_score import value_order_correlation
 from result_evaluator import ResultEvaluator
-import numpy as np
 
 
 def convert_numpy_types(obj):
@@ -69,7 +69,7 @@ class ResultCollector:
         }
         self.set_config(self.config)
     
-    def set_config(self, config: Dict[str, Any]):
+    def set_config(self, config: dict[str, any]):
         """Store experiment configuration"""
         self.experiment_config = config
         self._save_summary()
@@ -127,7 +127,7 @@ class ResultCollector:
         self._save_result(result)
         self._update_summary()
     
-    def _save_result(self, result: Dict[str, Any]):
+    def _save_result(self, result: dict[str, any]):
         """Append single result to JSONL file"""
         with open(self.results_file, 'a') as f:
             serializable_result = convert_numpy_types(result)
@@ -231,7 +231,6 @@ def run_eval(
     )
 
     client = ModelFactory.create_client(model)
-    result_evaluator = ResultEvaluator()
 
     for step in range(start_step, num_eval_steps):
         try:
@@ -244,21 +243,12 @@ def run_eval(
                 context_episodes=example.context_episodes,
             )
 
-            extracted_percentages = result_evaluator.evaluate(response)
-            voc_score_extracted = None
-
-            if extracted_percentages and len(extracted_percentages) == len(example.eval_episode.task_completion_predictions):
-                voc_score_extracted = value_order_correlation(
-                    extracted_percentages, 
-                    example.eval_episode.task_completion_predictions,
-                )
-
             collector.add_result(
                 step=step + 1,
                 example=example,
                 model_response=response,
-                voc_score=voc_score_extracted,
-                extracted_percentages=extracted_percentages,
+                voc_score=None,
+                extracted_percentages=None,
                 model_name=model
             )
             
