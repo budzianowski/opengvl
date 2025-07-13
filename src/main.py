@@ -2,7 +2,7 @@
 
 Run:
     python src/main.py --name lerobot/fmb --max_frames 4 --num_context_episodes 2 --model internvl
-    python src/main.py --batch_eval --results_file results/experiment_results.jsonl
+    python src/main.py --batch_eval --results_file results/gvl_eval_20250712_191338_results.jsonl
 """
 
 import argparse

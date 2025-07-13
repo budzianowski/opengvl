@@ -252,7 +252,6 @@ class TestBatchEvaluation:
     def test_evaluate_batch_single_response(self, evaluator, sample_responses):
         """Test batch evaluation with single response."""
         result = evaluator.evaluate_batch([sample_responses[0]])
-        breakpoint()
         assert len(result) == 1
         assert result[0] is not None
         assert isinstance(result[0], list)
@@ -262,7 +261,6 @@ class TestBatchEvaluation:
     def test_evaluate_batch_multiple_responses(self, evaluator, sample_responses):
         """Test batch evaluation with multiple responses."""
         result = evaluator.evaluate_batch(sample_responses[:3])
-        breakpoint()
         assert len(result) == 3
         # First two should have extracted percentages
         assert result[0] is not None

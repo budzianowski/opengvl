@@ -148,9 +148,6 @@ class ResultEvaluator:
         Returns:
             Path to the updated JSONL file
         """
-        if output_file is None:
-            output_file = jsonl_file
-            
         results = []
         
         # Read existing results
@@ -159,9 +156,7 @@ class ResultEvaluator:
                 if line.strip():
                     result = json.loads(line)
                     results.append(result)
-        
-        print(f"Processing {len(results)} results from {jsonl_file}")
-        
+
         # Filter results that need processing
         results_to_process = []
         results_indices = []
@@ -185,9 +180,7 @@ class ResultEvaluator:
         if not results_to_process:
             print("No results need processing")
             return output_file
-            
-        print(f"Found {len(results_to_process)} results that need processing")
-        
+
         # Process in batches
         updated_count = 0
         for batch_start in range(0, len(results_to_process), self.batch_size):
@@ -210,7 +203,7 @@ class ResultEvaluator:
                     # Calculate VOC score if we have valid percentages
                     voc_score = None
                     ground_truth = original_result.get('ground_truth_percentages')
-                    
+
                     if (extracted_percentages is not None and 
                         ground_truth is not None and 
                         len(extracted_percentages) == len(ground_truth)):
@@ -222,9 +215,7 @@ class ResultEvaluator:
                     
                     original_result['voc_score'] = voc_score
                     updated_count += 1
-                
-                print(f"Processed batch {batch_start//self.batch_size + 1}/{(len(results_to_process) + self.batch_size - 1)//self.batch_size} ({batch_end}/{len(results_to_process)} results)")
-                
+
             except Exception as e:
                 print(f"Error processing batch {batch_start}-{batch_end}: {e}")
                 # Set None values for failed batch
@@ -235,20 +226,16 @@ class ResultEvaluator:
         
         # Write updated results
         if output_file == jsonl_file:
-            # Use temporary file to avoid corruption
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.jsonl') as tmp_f:
                 temp_file = tmp_f.name
                 for result in results:
                     tmp_f.write(json.dumps(result) + '\n')
-            
-            # Replace original file
             shutil.move(temp_file, jsonl_file)
         else:
             with open(output_file, 'w') as f:
                 for result in results:
                     f.write(json.dumps(result) + '\n')
         
-        print(f"Updated {updated_count} results in {output_file}")
         return output_file
 
 
