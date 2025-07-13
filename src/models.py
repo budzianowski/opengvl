@@ -2,15 +2,18 @@
 import base64
 import io
 import os
+import tempfile
 from abc import abstractmethod
 from typing import List
 
 import numpy as np
 import torch
-from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM, AutoTokenizer, BitsAndBytesConfig, AutoModel, AutoModelForVision2Seq, AutoModelForCausalLM, Qwen2VLForConditionalGeneration
+from transformers import AutoModelForImageTextToText, AutoConfig, AutoProcessor, Gemma3ForCausalLM, AutoTokenizer, BitsAndBytesConfig, AutoModel, AutoModelForVision2Seq, AutoModelForCausalLM, Qwen2VLForConditionalGeneration
 import io
-
+import math
 from PIL import Image
+from torchvision.transforms import InterpolationMode
+import torchvision.transforms as T
 
 
 from data_loader import Episode
@@ -22,10 +25,22 @@ except ImportError:
     openai = None
 
 try:
+    from deepseek_vl.models import MultiModalityCausalLM, VLChatProcessor
+    from deepseek_vl.utils.io import load_pil_images as deepseek_load_pil_images
+except ImportError:
+    MultiModalityCausalLM = None
+    VLChatProcessor = None
+    deepseek_load_pil_images = None
+
+try:
     from google import genai
     from google.genai import types
 except ImportError:
     genai = None
+
+
+IMAGENET_MEAN = (0.485, 0.456, 0.406)
+IMAGENET_STD = (0.229, 0.224, 0.225)
 
 
 class BaseModelClient:
@@ -167,18 +182,122 @@ class InternVLClient(BaseModelClient):
     """InternVL client implementation"""
 
     def __init__(self):
-        if torch is None:
-            raise ImportError("PyTorch and transformers not installed")
-
-        self.device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
-        # model_checkpoint = "OpenGVLab/InternVL3-1B-hf"
-        model_checkpoint = "OpenGVLab/InternVL2_5-4B"
+        path = "OpenGVLab/InternVL3-8B"
+        device_map = self.split_model(path)
+    
         quantization_config = BitsAndBytesConfig(load_in_4bit=True)
-        self.processor = AutoProcessor.from_pretrained(model_checkpoint, trust_remote_code=True)
-        #self.model = AutoModelForImageTextToText.from_pretrained(
-        self.model = AutoModel.from_pretrained(
-            model_checkpoint, device_map=self.device, torch_dtype="auto", quantization_config=quantization_config, trust_remote_code=True
-        ).eval()
+        self.processor = AutoProcessor.from_pretrained(path, trust_remote_code=True)
+        self. model = AutoModel.from_pretrained(
+            path,
+            torch_dtype=torch.bfloat16,
+            low_cpu_mem_usage=True,
+            use_flash_attn=True,
+            trust_remote_code=True,
+            device_map=device_map).eval()
+
+    IMAGENET_MEAN = (0.485, 0.456, 0.406)
+    IMAGENET_STD = (0.229, 0.224, 0.225)
+
+    @staticmethod
+    def build_transform(input_size):
+        MEAN, STD = InternVLClient.IMAGENET_MEAN, InternVLClient.IMAGENET_STD
+        transform = T.Compose([
+            T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),
+            T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
+            T.ToTensor(),
+            T.Normalize(mean=MEAN, std=STD)
+        ])
+        return transform
+
+    @staticmethod
+    def find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height, image_size):
+        best_ratio_diff = float('inf')
+        best_ratio = (1, 1)
+        area = width * height
+        for ratio in target_ratios:
+            target_aspect_ratio = ratio[0] / ratio[1]
+            ratio_diff = abs(aspect_ratio - target_aspect_ratio)
+            if ratio_diff < best_ratio_diff:
+                best_ratio_diff = ratio_diff
+                best_ratio = ratio
+            elif ratio_diff == best_ratio_diff:
+                if area > 0.5 * image_size * image_size * ratio[0] * ratio[1]:
+                    best_ratio = ratio
+        return best_ratio
+
+    @staticmethod
+    def dynamic_preprocess(image, min_num=1, max_num=12, image_size=448, use_thumbnail=False):
+        orig_width, orig_height = image.size
+        aspect_ratio = orig_width / orig_height
+
+        # calculate the existing image aspect ratio
+        target_ratios = set(
+            (i, j) for n in range(min_num, max_num + 1) for i in range(1, n + 1) for j in range(1, n + 1) if
+            i * j <= max_num and i * j >= min_num)
+        target_ratios = sorted(target_ratios, key=lambda x: x[0] * x[1])
+
+        # find the closest aspect ratio to the target
+        target_aspect_ratio = InternVLClient.find_closest_aspect_ratio(
+            aspect_ratio, target_ratios, orig_width, orig_height, image_size)
+
+        # calculate the target width and height
+        target_width = image_size * target_aspect_ratio[0]
+        target_height = image_size * target_aspect_ratio[1]
+        blocks = target_aspect_ratio[0] * target_aspect_ratio[1]
+
+        # resize the image
+        resized_img = image.resize((target_width, target_height))
+        processed_images = []
+        for i in range(blocks):
+            box = (
+                (i % (target_width // image_size)) * image_size,
+                (i // (target_width // image_size)) * image_size,
+                ((i % (target_width // image_size)) + 1) * image_size,
+                ((i // (target_width // image_size)) + 1) * image_size
+            )
+            # split the image
+            split_img = resized_img.crop(box)
+            processed_images.append(split_img)
+        assert len(processed_images) == blocks
+        if use_thumbnail and len(processed_images) != 1:
+            thumbnail_img = image.resize((image_size, image_size))
+            processed_images.append(thumbnail_img)
+        return processed_images
+
+    def load_image(self, image, input_size=448, max_num=12):
+        transform = self.build_transform(input_size=input_size)
+        images = self.dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
+        pixel_values = [transform(image) for image in images]
+        pixel_values = torch.stack(pixel_values)
+        return pixel_values
+
+    def split_model(self, model_path):
+        device_map = {}
+        world_size = torch.cuda.device_count()
+        print(f"World size: {world_size}")
+        config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
+        num_layers = config.llm_config.num_hidden_layers
+        # Since the first GPU will be used for ViT, treat it as half a GPU.
+        num_layers_per_gpu = math.ceil(num_layers / (world_size - 0.5))
+        num_layers_per_gpu = [num_layers_per_gpu] * world_size
+        num_layers_per_gpu[0] = math.ceil(num_layers_per_gpu[0] * 0.5)
+        layer_cnt = 0
+        for i, num_layer in enumerate(num_layers_per_gpu):
+            for j in range(num_layer):
+                device_map[f'language_model.model.layers.{layer_cnt}'] = i
+                layer_cnt += 1
+        device_map['vision_model'] = 0
+        device_map['mlp1'] = 0
+        device_map['language_model.model.tok_embeddings'] = 0
+        device_map['language_model.model.embed_tokens'] = 0
+        device_map['language_model.output'] = 0
+        device_map['language_model.model.norm'] = 0
+        device_map['language_model.model.rotary_emb'] = 0
+        device_map['language_model.lm_head'] = 0
+        if num_layers > 0:
+            device_map[f'language_model.model.layers.{num_layers - 1}'] = 0
+
+        return device_map
 
     def generate_response(
         self,
@@ -186,72 +305,50 @@ class InternVLClient(BaseModelClient):
         eval_episode: Episode,
         context_episodes: List[Episode],
     ) -> str:
-        content = [{"type": "text", "text": prompt}]
+        pil_images = []
+        text_prompt = prompt
 
         # Add initial scene
-        content.extend(
-            [
-                {"type": "text", "text": "Initial robot scene:"},
-                {"type": "image", "base64": self.encode_image(eval_episode.starting_frame)},
-                {
-                    "type": "text",
-                    "text": "In the initial robot scene, the task completion percentage is 0.\n",
-                },
-            ]
-        )
+        text_prompt += "\nInitial robot scene:<image>"
+        pil_images.append(self._to_pil(eval_episode.starting_frame))
+        text_prompt += "\nIn the initial robot scene, the task completion percentage is 0."
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
-            content.extend(
-                [
-                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}.\n"},
-                    {"type": "text", "text": f"Instruction: {context_episode.instruction}\n"},
-                ]
-            )
+            text_prompt += f"\nExample episode {ctx_episode_idx+1}.\n"
+            text_prompt += f"Instruction: {context_episode.instruction}\n"
 
             for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
-                content.extend(
-                    [
-                        {"type": "text", "text": f"Frame {i+1}: \n"},
-                        {"type": "image", "base64": self.encode_image(frame)},
-                        {
-                            "type": "text",
-                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
-                        },
-                    ]
-                )
+                text_prompt += f"Frame {i+1}: <image>"
+                pil_images.append(self._to_pil(frame))
+                text_prompt += f" Task Completion Percentage: {task_completion:.1f}%"
 
         # Add query instruction
-        content.append(
-            {
-                "type": "text",
-                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage (with the format Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%) for the following frames:",
-            }
-        )
+        text_prompt += f"\nNow, for the task of {eval_episode.instruction}, output the task completion percentage (with the format Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%) for the following frames:"
 
         # Add query images
         for i, frame in enumerate(eval_episode.frames, 1):
-            content.extend(
-                [
-                    {"type": "text", "text": f"Frame {i}: \n"},
-                    {"type": "image", "base64": self.encode_image(frame)},
-                ]
-            )
+            text_prompt += f"\nFrame {i}: <image>"
+            pil_images.append(self._to_pil(frame))
 
-        messages = [{"role": "user", "content": content}]
+        pixel_values_list = []
+        for img in pil_images:
+            pixel_values = self.load_image(img).to(torch.bfloat16)
+            pixel_values_list.append(pixel_values)
 
-        inputs = self.processor.apply_chat_template(
-            messages,
-            padding=True,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
-        ).to(self.model.device, dtype=torch.bfloat16)
+        pixel_values = torch.cat(pixel_values_list, dim=0)
+        num_patches_list = [pv.size(0) for pv in pixel_values_list]
 
-        output = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
-        decoded_outputs = self.processor.batch_decode(output, skip_special_tokens=True)
-        return decoded_outputs[0]
+        generation_config = dict(
+            num_beams=1,
+            max_new_tokens=1024,
+            do_sample=False,
+        )
+
+        response, history = self.model.chat(self.processor, pixel_values, text_prompt, generation_config,
+                               num_patches_list=num_patches_list,
+                               history=None, return_history=True)
+        return response
 
 
 class SmolVLMClient(BaseModelClient):
@@ -348,6 +445,109 @@ class SmolVLMClient(BaseModelClient):
         )
 
         return generated_texts[0]
+
+
+class DeepseekClient(BaseModelClient):
+    """Deepseek client implementation"""
+
+    def __init__(self):
+        if torch is None or MultiModalityCausalLM is None or VLChatProcessor is None:
+            raise ImportError("PyTorch and deepseek-vl not installed")
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        model_path = "deepseek-ai/deepseek-vl-1.3b-chat"
+        
+        self.vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(model_path)
+        self.tokenizer = self.vl_chat_processor.tokenizer
+        
+        self.model: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(
+            model_path, trust_remote_code=True
+        )
+        self.model = self.model.to(torch.bfloat16).to(self.device).eval()
+
+    def generate_response(
+        self,
+        prompt: str,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
+    ) -> str:
+        
+        temp_dir = tempfile.mkdtemp()
+        image_paths = []
+        
+        try:
+            # Build the conversation for Deepseek-VL, saving images to temporary files
+            conversation_content = prompt + "\nInitial robot scene: <image_placeholder>"
+            
+            # Save initial frame and get path
+            initial_frame_path = os.path.join(temp_dir, "initial_frame.png")
+            self._to_pil(eval_episode.starting_frame).save(initial_frame_path)
+            image_paths.append(initial_frame_path)
+            
+            conversation_content += "\nIn the initial robot scene, the task completion percentage is 0."
+
+            # Add context episodes
+            for ctx_episode_idx, context_episode in enumerate(context_episodes):
+                conversation_content += f"\nExample episode {ctx_episode_idx+1}.\nInstruction: {context_episode.instruction}\n"
+                for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                    conversation_content += f"Frame {i+1}: <image_placeholder> Task Completion Percentage: {task_completion:.1f}%\n"
+                    frame_path = os.path.join(temp_dir, f"ctx_{ctx_episode_idx}_frame_{i}.png")
+                    self._to_pil(frame).save(frame_path)
+                    image_paths.append(frame_path)
+
+            # Add query instruction
+            conversation_content += f"\nNow, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%\n"
+
+            # Add query images
+            for i, frame in enumerate(eval_episode.frames, 1):
+                conversation_content += f"Frame {i}: <image_placeholder>\n"
+                frame_path = os.path.join(temp_dir, f"query_frame_{i}.png")
+                self._to_pil(frame).save(frame_path)
+                image_paths.append(frame_path)
+
+            conversation = [
+                {
+                    "role": "User",
+                    "content": conversation_content,
+                    "images": image_paths
+                },
+                {
+                    "role": "Assistant",
+                    "content": ""
+                }
+            ]
+
+            # load images and prepare for inputs
+            pil_images = deepseek_load_pil_images(conversation)
+            prepare_inputs = self.vl_chat_processor(
+                conversations=conversation,
+                images=pil_images,
+                force_batchify=True
+            ).to(self.model.device)
+
+            # run image encoder to get the image embeddings
+            inputs_embeds = self.model.prepare_inputs_embeds(**prepare_inputs)
+
+            # run the model to get the response
+            outputs = self.model.language_model.generate(
+                inputs_embeds=inputs_embeds,
+                attention_mask=prepare_inputs.attention_mask,
+                pad_token_id=self.tokenizer.eos_token_id,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=False,
+                use_cache=True
+            )
+
+            answer = self.tokenizer.decode(outputs[0].cpu().tolist(), skip_special_tokens=True)
+            return answer
+        finally:
+            # Clean up temporary directory
+            for path in image_paths:
+                if os.path.exists(path):
+                    os.remove(path)
+            os.rmdir(temp_dir)
 
 
 class QwenClient(BaseModelClient):
@@ -593,6 +793,8 @@ class ModelFactory:
             return SmolVLMClient()
         elif model_name.lower() == "qwen":
             return QwenClient()
+        elif model_name.lower() == "deepseek":
+            return DeepseekClient()
         elif model_name.lower() == "gemma":
             return GemmaClient()
         elif model_name.lower() == "gemini":
