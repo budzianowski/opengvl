@@ -280,7 +280,7 @@ if __name__ == "__main__":
         "--model",
         type=str,
         default="gpt4o",
-        choices=["gpt4o", "internvl", "gemma", "gemini"],
+        choices=["gpt4o", "internvl", "gemma", "gemini", "smolvlm", "qwen"],
         help="Model to use for inference",
     )
     parser.add_argument(

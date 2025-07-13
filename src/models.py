@@ -7,7 +7,7 @@ from typing import List
 from data_loader import Episode
 import numpy as np
 import torch
-from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM, AutoTokenizer
+from transformers import AutoModelForImageTextToText, AutoProcessor, Gemma3ForCausalLM, AutoTokenizer, BitsAndBytesConfig, AutoModel, AutoModelForVision2Seq, AutoModelForCausalLM, Qwen2VLForConditionalGeneration
 import io
 from PIL import Image
 # third-party imports
@@ -37,9 +37,11 @@ class BaseModelClient:
         """Generate response from the model"""
         pass
 
-    def encode_image(self, image) -> str:
-        """Encode image to base64 string for API calls"""
-        
+    def _to_pil(self, image) -> Image.Image:
+        """Convert image to PIL Image."""
+        if isinstance(image, Image.Image):
+            return image
+
         # Convert tensor to numpy if needed
         if hasattr(image, 'detach'):  # PyTorch tensor
             if image.is_cuda:
@@ -67,9 +69,13 @@ class BaseModelClient:
             else:
                 raise ValueError(f"Unsupported image shape: {image.shape}")
         else:
-            # Assume it's already a PIL Image
-            pil_image = image
+            raise ValueError(f"Unsupported image type: {type(image)}")
         
+        return pil_image
+
+    def encode_image(self, image) -> str:
+        """Encode image to base64 string for API calls"""
+        pil_image = self._to_pil(image)
         # Convert to base64
         buffer = io.BytesIO()
         pil_image.save(buffer, format='PNG')
@@ -160,10 +166,13 @@ class InternVLClient(BaseModelClient):
             raise ImportError("PyTorch and transformers not installed")
 
         self.device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
-        model_checkpoint = "OpenGVLab/InternVL3-1B-hf"
-        self.processor = AutoProcessor.from_pretrained(model_checkpoint)
-        self.model = AutoModelForImageTextToText.from_pretrained(
-            model_checkpoint, device_map=self.device, torch_dtype=torch.bfloat16
+        # model_checkpoint = "OpenGVLab/InternVL3-1B-hf"
+        model_checkpoint = "OpenGVLab/InternVL2_5-4B"
+        quantization_config = BitsAndBytesConfig(load_in_4bit=True)
+        self.processor = AutoProcessor.from_pretrained(model_checkpoint, trust_remote_code=True)
+        #self.model = AutoModelForImageTextToText.from_pretrained(
+        self.model = AutoModel.from_pretrained(
+            model_checkpoint, device_map=self.device, torch_dtype="auto", quantization_config=quantization_config, trust_remote_code=True
         ).eval()
 
     def generate_response(
@@ -239,6 +248,200 @@ class InternVLClient(BaseModelClient):
         output = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
         decoded_outputs = self.processor.batch_decode(output, skip_special_tokens=True)
         return decoded_outputs[0]
+
+
+class SmolVLMClient(BaseModelClient):
+    """SmolVLM client implementation"""
+
+    def __init__(self):
+        if torch is None:
+            raise ImportError("PyTorch and transformers not installed")
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        model_checkpoint = "HuggingFaceTB/SmolVLM-Instruct"
+        
+        self.processor = AutoProcessor.from_pretrained(model_checkpoint)
+        self.model = AutoModelForVision2Seq.from_pretrained(
+            model_checkpoint,
+            torch_dtype=torch.bfloat16,
+            _attn_implementation="flash_attention_2" if self.device == "cuda" else "eager",
+        ).to(self.device)
+
+    def generate_response(
+        self,
+        prompt: str,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
+    ) -> str:
+        
+        images = []
+        content = [{"type": "text", "text": prompt}]
+
+        # Add initial scene
+        content.extend(
+            [
+                {"type": "text", "text": "Initial robot scene:"},
+                {"type": "image"},
+                {
+                    "type": "text",
+                    "text": "In the initial robot scene, the task completion percentage is 0.",
+                },
+            ]
+        )
+        images.append(eval_episode.starting_frame)
+
+        # Add example images with completion percentages
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
+            content.extend(
+                [
+                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
+                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
+                ]
+            )
+
+            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                content.extend(
+                    [
+                        {"type": "text", "text": f"Frame {i+1}: "},
+                        {"type": "image"},
+                        {
+                            "type": "text",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
+                        },
+                    ]
+                )
+                images.append(frame)
+
+        # Add query instruction
+        content.append(
+            {
+                "type": "text",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
+            }
+        )
+
+        # Add query images
+        for i, frame in enumerate(eval_episode.frames, 1):
+            content.extend(
+                [
+                    {"type": "text", "text": f"Frame {i}: "},
+                    {"type": "image"},
+                ]
+            )
+            images.append(frame)
+
+        messages = [{"role": "user", "content": content}]
+        
+        pil_images = [self._to_pil(img) for img in images]
+
+        prompt_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
+        inputs = self.processor(text=prompt_text, images=pil_images, return_tensors="pt").to(self.device)
+
+        generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
+        generated_texts = self.processor.batch_decode(
+            generated_ids,
+            skip_special_tokens=True,
+        )
+
+        return generated_texts[0]
+
+
+class QwenClient(BaseModelClient):
+    """Qwen client implementation"""
+
+    def __init__(self):
+        if torch is None:
+            raise ImportError("PyTorch and transformers not installed")
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        model_id = "Qwen/Qwen2-VL-2B-Instruct"
+        
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+        )
+        
+        self.model = Qwen2VLForConditionalGeneration.from_pretrained(
+            model_id,
+            torch_dtype=torch.bfloat16,
+            # quantization_config=quantization_config,
+            attn_implementation="flash_attention_2",
+            device_map="auto"
+        )
+        self.processor = AutoProcessor.from_pretrained(model_id)
+
+    def generate_response(
+        self,
+        prompt: str,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
+    ) -> str:
+        
+        pil_images = []
+        messages = [{"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]}]
+        
+        # Initial prompt
+        user_content = [{"type": "text", "text": prompt}]
+
+        # Assistant response for initial prompt
+
+        def _process_and_get_image_content(frame):
+            try:
+                pil_images.append(self._to_pil(frame))
+                return {"type": "image"}
+            except ValueError:
+                print(f"[ERROR] Image not loaded")
+                return []
+
+        # Add initial scene
+        user_content.append({"type": "text", "text": "Initial robot scene: "})
+        user_content.append(_process_and_get_image_content(eval_episode.starting_frame))
+
+        # Add example images with completion percentages
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
+            user_content.append({"type": "text", "text": f"Example episode {ctx_episode_idx+1}. Instruction: {context_episode.instruction}\n"})
+            
+            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                user_content.extend([
+                    {"type": "text", "text": f"Frame {i+1}: "},
+                    _process_and_get_image_content(frame),
+                    {"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}% \n"}
+                ])
+
+
+        # Add query instruction
+        user_content.append({"type": "text", "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%'n"})
+
+        # Add query images
+        for i, frame in enumerate(eval_episode.frames, 1):
+            user_content.extend([
+                {"type": "text", "text": f"Frame {i}: "},
+                _process_and_get_image_content(frame)
+                ])
+        
+        messages.append({"role": "user", "content": user_content})
+
+        text = self.processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        
+        print(f"Text: {text}")
+        inputs = self.processor(
+            text=[text],
+            images=pil_images,
+            padding=True,
+            return_tensors="pt",
+        )
+        inputs = inputs.to(self.device)
+
+        generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
+        generated_ids_trimmed = [
+            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+        ]
+        response = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True)[0]
+        return response
 
 
 class GemmaClient(BaseModelClient):
@@ -382,6 +585,10 @@ class ModelFactory:
     def create_client(model_name: str) -> BaseModelClient:
         if model_name.lower() == "internvl":
             return InternVLClient()
+        elif model_name.lower() == "smolvlm":
+            return SmolVLMClient()
+        elif model_name.lower() == "qwen":
+            return QwenClient()
         elif model_name.lower() == "gemma":
             return GemmaClient()
         elif model_name.lower() == "gemini":
