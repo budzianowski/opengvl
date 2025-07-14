@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=toto2-14b
-#SBATCH --output=toto2-14b-%j.out
-#SBATCH --error=toto2-14b-%j.err
+#SBATCH --job-name=gemma3-4b-two-shot-mutex
+#SBATCH --output=gemma3-4b-two-shot-mutex-%j.out
+#SBATCH --error=gemma3-4b-two-shot-mutex-%j.err
 #SBATCH --time=08:00:00
 #SBATCH --account=plgopenglv-gpu-a100
 #SBATCH --partition=plgrid-gpu-a100
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=48G
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 
 # Set environment variables
 export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
@@ -26,4 +26,4 @@ conda activate gvl_cuda
 
 # lerobot/fmb, lerobot/utaustin_mutex, lerobot/toto
 
-python src/main.py --name lerobot/toto --max_frames 20 --model qwen --num_eval_steps 200 --num_context_episodes 2
+python src/main.py --name lerobot/utaustin_mutex --max_frames 20 --model gemma --num_eval_steps 200 --num_context_episodes 2

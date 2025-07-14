@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=toto
-#SBATCH --output=toto-%j.out
-#SBATCH --error=toto-%j.err
+#SBATCH --job-name=gemma3-4b-zero-shot-toto
+#SBATCH --output=gemma3-4b-zero-shot-toto-%j.out
+#SBATCH --error=gemma3-4b-zero-shot-toto-%j.err
 #SBATCH --time=08:00:00
 #SBATCH --account=plgopenglv-gpu-a100
 #SBATCH --partition=plgrid-gpu-a100
@@ -25,4 +25,4 @@ conda activate gvl_cuda
 
 # lerobot/fmb, lerobot/utaustin_mutex, lerobot/toto
 
-python src/main.py --name lerobot/toto --max_frames 20 --model internvl --num_eval_steps 200 --num_context_episodes 0
+python src/main.py --name lerobot/toto --max_frames 20 --model gemma --num_eval_steps 200 --num_context_episodes 0

@@ -1,6 +1,8 @@
 """Model clients for the different models."""
+
 import base64
 import io
+import math
 import os
 import tempfile
 from abc import abstractmethod
@@ -8,13 +10,15 @@ from typing import List
 
 import numpy as np
 import torch
-from transformers import AutoModelForImageTextToText, AutoConfig, AutoProcessor, Gemma3ForCausalLM, AutoTokenizer, BitsAndBytesConfig, AutoModel, AutoModelForVision2Seq, AutoModelForCausalLM, Qwen2VLForConditionalGeneration
-import io
-import math
+import torchvision.transforms as T
+from loguru import logger
 from PIL import Image
 from torchvision.transforms import InterpolationMode
-import torchvision.transforms as T
-
+from transformers import (AutoConfig, AutoModel, AutoModelForCausalLM,
+                          AutoModelForImageTextToText, AutoModelForVision2Seq,
+                          AutoProcessor, AutoTokenizer, BitsAndBytesConfig,
+                          Gemma3ForConditionalGeneration,
+                          Qwen2VLForConditionalGeneration)
 
 from data_loader import Episode
 
@@ -45,8 +49,9 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 
 class BaseModelClient:
     """Base class for all model clients"""
+
     max_new_tokens = 1000
-    
+
     @abstractmethod
     def generate_response(
         self,
@@ -63,34 +68,34 @@ class BaseModelClient:
             return image
 
         # Convert tensor to numpy if needed
-        if hasattr(image, 'detach'):  # PyTorch tensor
+        if hasattr(image, "detach"):  # PyTorch tensor
             if image.is_cuda:
                 image = image.cpu()
             image = image.detach().numpy()
-        
+
         # Handle different numpy array formats
         if isinstance(image, np.ndarray):
             # Normalize if values are in [0, 1] range
             if image.dtype == np.float32 or image.dtype == np.float64:
                 if image.max() <= 1.0:
                     image = (image * 255).astype(np.uint8)
-            
+
             # Handle channel dimension - convert (C, H, W) to (H, W, C)
             if len(image.shape) == 3 and image.shape[0] in [1, 3, 4]:
                 image = np.transpose(image, (1, 2, 0))
-            
+
             # Convert to PIL Image
             if len(image.shape) == 3 and image.shape[2] == 3:
-                pil_image = Image.fromarray(image, 'RGB')
+                pil_image = Image.fromarray(image, "RGB")
             elif len(image.shape) == 3 and image.shape[2] == 1:
-                pil_image = Image.fromarray(image.squeeze(), 'L')
+                pil_image = Image.fromarray(image.squeeze(), "L")
             elif len(image.shape) == 2:
-                pil_image = Image.fromarray(image, 'L')
+                pil_image = Image.fromarray(image, "L")
             else:
                 raise ValueError(f"Unsupported image shape: {image.shape}")
         else:
             raise ValueError(f"Unsupported image type: {type(image)}")
-        
+
         return pil_image
 
     def encode_image(self, image) -> str:
@@ -98,8 +103,8 @@ class BaseModelClient:
         pil_image = self._to_pil(image)
         # Convert to base64
         buffer = io.BytesIO()
-        pil_image.save(buffer, format='PNG')
-        return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        pil_image.save(buffer, format="PNG")
+        return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 class GPT4oClient(BaseModelClient):
@@ -124,7 +129,9 @@ class GPT4oClient(BaseModelClient):
                 {"type": "text", "text": "Initial robot scene:"},
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{self.encode_image(eval_episode.starting_frame)}"},
+                    "image_url": {
+                        "url": f"data:image/png;base64,{self.encode_image(eval_episode.starting_frame)}"
+                    },
                 },
                 {
                     "type": "text",
@@ -132,22 +139,32 @@ class GPT4oClient(BaseModelClient):
                 },
             ]
         )
+
+        logger.info(f"Frame type: {type(eval_episode.starting_frame)}")
+        logger.info(f"Frame: {eval_episode.starting_frame}")
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
             messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
-                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
+                    {
+                        "type": "text",
+                        "text": f"Instruction: {context_episode.instruction}",
+                    },
                 ]
             )
 
-            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
                 messages[0]["content"].extend(
                     [
                         {"type": "text", "text": f"Frame {i+1}: "},
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{self.encode_image(frame)}"},
+                            "image_url": {
+                                "url": f"data:image/png;base64,{self.encode_image(frame)}"
+                            },
                         },
                         {
                             "type": "text",
@@ -170,11 +187,15 @@ class GPT4oClient(BaseModelClient):
                     {"type": "text", "text": f"Frame {i}: "},
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/png;base64,{self.encode_image(frame)}"},
+                        "image_url": {
+                            "url": f"data:image/png;base64,{self.encode_image(frame)}"
+                        },
                     },
                 ]
             )
-        response = self.client.chat.completions.create(model="gpt-4o", messages=messages)
+        response = self.client.chat.completions.create(
+            model="gpt-4o", messages=messages
+        )
         return response.choices[0].message.content
 
 
@@ -184,16 +205,17 @@ class InternVLClient(BaseModelClient):
     def __init__(self):
         path = "OpenGVLab/InternVL3-8B"
         device_map = self.split_model(path)
-    
+
         quantization_config = BitsAndBytesConfig(load_in_4bit=True)
         self.processor = AutoProcessor.from_pretrained(path, trust_remote_code=True)
-        self. model = AutoModel.from_pretrained(
+        self.model = AutoModel.from_pretrained(
             path,
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             use_flash_attn=True,
             trust_remote_code=True,
-            device_map=device_map).eval()
+            device_map=device_map,
+        ).eval()
 
     IMAGENET_MEAN = (0.485, 0.456, 0.406)
     IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -201,17 +223,23 @@ class InternVLClient(BaseModelClient):
     @staticmethod
     def build_transform(input_size):
         MEAN, STD = InternVLClient.IMAGENET_MEAN, InternVLClient.IMAGENET_STD
-        transform = T.Compose([
-            T.Lambda(lambda img: img.convert('RGB') if img.mode != 'RGB' else img),
-            T.Resize((input_size, input_size), interpolation=InterpolationMode.BICUBIC),
-            T.ToTensor(),
-            T.Normalize(mean=MEAN, std=STD)
-        ])
+        transform = T.Compose(
+            [
+                T.Lambda(lambda img: img.convert("RGB") if img.mode != "RGB" else img),
+                T.Resize(
+                    (input_size, input_size), interpolation=InterpolationMode.BICUBIC
+                ),
+                T.ToTensor(),
+                T.Normalize(mean=MEAN, std=STD),
+            ]
+        )
         return transform
 
     @staticmethod
-    def find_closest_aspect_ratio(aspect_ratio, target_ratios, width, height, image_size):
-        best_ratio_diff = float('inf')
+    def find_closest_aspect_ratio(
+        aspect_ratio, target_ratios, width, height, image_size
+    ):
+        best_ratio_diff = float("inf")
         best_ratio = (1, 1)
         area = width * height
         for ratio in target_ratios:
@@ -226,19 +254,26 @@ class InternVLClient(BaseModelClient):
         return best_ratio
 
     @staticmethod
-    def dynamic_preprocess(image, min_num=1, max_num=12, image_size=448, use_thumbnail=False):
+    def dynamic_preprocess(
+        image, min_num=1, max_num=12, image_size=448, use_thumbnail=False
+    ):
         orig_width, orig_height = image.size
         aspect_ratio = orig_width / orig_height
 
         # calculate the existing image aspect ratio
         target_ratios = set(
-            (i, j) for n in range(min_num, max_num + 1) for i in range(1, n + 1) for j in range(1, n + 1) if
-            i * j <= max_num and i * j >= min_num)
+            (i, j)
+            for n in range(min_num, max_num + 1)
+            for i in range(1, n + 1)
+            for j in range(1, n + 1)
+            if i * j <= max_num and i * j >= min_num
+        )
         target_ratios = sorted(target_ratios, key=lambda x: x[0] * x[1])
 
         # find the closest aspect ratio to the target
         target_aspect_ratio = InternVLClient.find_closest_aspect_ratio(
-            aspect_ratio, target_ratios, orig_width, orig_height, image_size)
+            aspect_ratio, target_ratios, orig_width, orig_height, image_size
+        )
 
         # calculate the target width and height
         target_width = image_size * target_aspect_ratio[0]
@@ -253,7 +288,7 @@ class InternVLClient(BaseModelClient):
                 (i % (target_width // image_size)) * image_size,
                 (i // (target_width // image_size)) * image_size,
                 ((i % (target_width // image_size)) + 1) * image_size,
-                ((i // (target_width // image_size)) + 1) * image_size
+                ((i // (target_width // image_size)) + 1) * image_size,
             )
             # split the image
             split_img = resized_img.crop(box)
@@ -266,7 +301,9 @@ class InternVLClient(BaseModelClient):
 
     def load_image(self, image, input_size=448, max_num=12):
         transform = self.build_transform(input_size=input_size)
-        images = self.dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
+        images = self.dynamic_preprocess(
+            image, image_size=input_size, use_thumbnail=True, max_num=max_num
+        )
         pixel_values = [transform(image) for image in images]
         pixel_values = torch.stack(pixel_values)
         return pixel_values
@@ -284,18 +321,18 @@ class InternVLClient(BaseModelClient):
         layer_cnt = 0
         for i, num_layer in enumerate(num_layers_per_gpu):
             for j in range(num_layer):
-                device_map[f'language_model.model.layers.{layer_cnt}'] = i
+                device_map[f"language_model.model.layers.{layer_cnt}"] = i
                 layer_cnt += 1
-        device_map['vision_model'] = 0
-        device_map['mlp1'] = 0
-        device_map['language_model.model.tok_embeddings'] = 0
-        device_map['language_model.model.embed_tokens'] = 0
-        device_map['language_model.output'] = 0
-        device_map['language_model.model.norm'] = 0
-        device_map['language_model.model.rotary_emb'] = 0
-        device_map['language_model.lm_head'] = 0
+        device_map["vision_model"] = 0
+        device_map["mlp1"] = 0
+        device_map["language_model.model.tok_embeddings"] = 0
+        device_map["language_model.model.embed_tokens"] = 0
+        device_map["language_model.output"] = 0
+        device_map["language_model.model.norm"] = 0
+        device_map["language_model.model.rotary_emb"] = 0
+        device_map["language_model.lm_head"] = 0
         if num_layers > 0:
-            device_map[f'language_model.model.layers.{num_layers - 1}'] = 0
+            device_map[f"language_model.model.layers.{num_layers - 1}"] = 0
 
         return device_map
 
@@ -311,14 +348,18 @@ class InternVLClient(BaseModelClient):
         # Add initial scene
         text_prompt += "\nInitial robot scene:<image>"
         pil_images.append(self._to_pil(eval_episode.starting_frame))
-        text_prompt += "\nIn the initial robot scene, the task completion percentage is 0."
+        text_prompt += (
+            "\nIn the initial robot scene, the task completion percentage is 0."
+        )
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
             text_prompt += f"\nExample episode {ctx_episode_idx+1}.\n"
             text_prompt += f"Instruction: {context_episode.instruction}\n"
 
-            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
                 text_prompt += f"Frame {i+1}: <image>"
                 pil_images.append(self._to_pil(frame))
                 text_prompt += f" Task Completion Percentage: {task_completion:.1f}%"
@@ -345,9 +386,15 @@ class InternVLClient(BaseModelClient):
             do_sample=False,
         )
 
-        response, history = self.model.chat(self.processor, pixel_values, text_prompt, generation_config,
-                               num_patches_list=num_patches_list,
-                               history=None, return_history=True)
+        response, history = self.model.chat(
+            self.processor,
+            pixel_values,
+            text_prompt,
+            generation_config,
+            num_patches_list=num_patches_list,
+            history=None,
+            return_history=True,
+        )
         return response
 
 
@@ -360,12 +407,14 @@ class SmolVLMClient(BaseModelClient):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         model_checkpoint = "HuggingFaceTB/SmolVLM-Instruct"
-        
+
         self.processor = AutoProcessor.from_pretrained(model_checkpoint)
         self.model = AutoModelForVision2Seq.from_pretrained(
             model_checkpoint,
             torch_dtype=torch.bfloat16,
-            _attn_implementation="flash_attention_2" if self.device == "cuda" else "eager",
+            _attn_implementation=(
+                "flash_attention_2" if self.device == "cuda" else "eager"
+            ),
         ).to(self.device)
 
     def generate_response(
@@ -374,7 +423,7 @@ class SmolVLMClient(BaseModelClient):
         eval_episode: Episode,
         context_episodes: List[Episode],
     ) -> str:
-        
+
         images = []
         content = [{"type": "text", "text": prompt}]
 
@@ -396,11 +445,16 @@ class SmolVLMClient(BaseModelClient):
             content.extend(
                 [
                     {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
-                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
+                    {
+                        "type": "text",
+                        "text": f"Instruction: {context_episode.instruction}",
+                    },
                 ]
             )
 
-            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
                 content.extend(
                     [
                         {"type": "text", "text": f"Frame {i+1}: "},
@@ -432,13 +486,19 @@ class SmolVLMClient(BaseModelClient):
             images.append(frame)
 
         messages = [{"role": "user", "content": content}]
-        
+
         pil_images = [self._to_pil(img) for img in images]
 
-        prompt_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
-        inputs = self.processor(text=prompt_text, images=pil_images, return_tensors="pt").to(self.device)
+        prompt_text = self.processor.apply_chat_template(
+            messages, add_generation_prompt=True
+        )
+        inputs = self.processor(
+            text=prompt_text, images=pil_images, return_tensors="pt"
+        ).to(self.device)
 
-        generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
+        generated_ids = self.model.generate(
+            **inputs, max_new_tokens=self.max_new_tokens
+        )
         generated_texts = self.processor.batch_decode(
             generated_ids,
             skip_special_tokens=True,
@@ -456,10 +516,12 @@ class DeepseekClient(BaseModelClient):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         model_path = "deepseek-ai/deepseek-vl-1.3b-chat"
-        
-        self.vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(model_path)
+
+        self.vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(
+            model_path
+        )
         self.tokenizer = self.vl_chat_processor.tokenizer
-        
+
         self.model: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(
             model_path, trust_remote_code=True
         )
@@ -471,27 +533,36 @@ class DeepseekClient(BaseModelClient):
         eval_episode: Episode,
         context_episodes: List[Episode],
     ) -> str:
-        
+
         temp_dir = tempfile.mkdtemp()
         image_paths = []
-        
+
         try:
             # Build the conversation for Deepseek-VL, saving images to temporary files
             conversation_content = prompt + "\nInitial robot scene: <image_placeholder>"
-            
+
             # Save initial frame and get path
             initial_frame_path = os.path.join(temp_dir, "initial_frame.png")
             self._to_pil(eval_episode.starting_frame).save(initial_frame_path)
             image_paths.append(initial_frame_path)
-            
-            conversation_content += "\nIn the initial robot scene, the task completion percentage is 0."
+
+            conversation_content += (
+                "\nIn the initial robot scene, the task completion percentage is 0."
+            )
 
             # Add context episodes
             for ctx_episode_idx, context_episode in enumerate(context_episodes):
                 conversation_content += f"\nExample episode {ctx_episode_idx+1}.\nInstruction: {context_episode.instruction}\n"
-                for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+                for i, (task_completion, frame) in enumerate(
+                    zip(
+                        context_episode.task_completion_predictions,
+                        context_episode.frames,
+                    )
+                ):
                     conversation_content += f"Frame {i+1}: <image_placeholder> Task Completion Percentage: {task_completion:.1f}%\n"
-                    frame_path = os.path.join(temp_dir, f"ctx_{ctx_episode_idx}_frame_{i}.png")
+                    frame_path = os.path.join(
+                        temp_dir, f"ctx_{ctx_episode_idx}_frame_{i}.png"
+                    )
                     self._to_pil(frame).save(frame_path)
                     image_paths.append(frame_path)
 
@@ -509,20 +580,15 @@ class DeepseekClient(BaseModelClient):
                 {
                     "role": "User",
                     "content": conversation_content,
-                    "images": image_paths
+                    "images": image_paths,
                 },
-                {
-                    "role": "Assistant",
-                    "content": ""
-                }
+                {"role": "Assistant", "content": ""},
             ]
 
             # load images and prepare for inputs
             pil_images = deepseek_load_pil_images(conversation)
             prepare_inputs = self.vl_chat_processor(
-                conversations=conversation,
-                images=pil_images,
-                force_batchify=True
+                conversations=conversation, images=pil_images, force_batchify=True
             ).to(self.model.device)
 
             # run image encoder to get the image embeddings
@@ -537,10 +603,12 @@ class DeepseekClient(BaseModelClient):
                 eos_token_id=self.tokenizer.eos_token_id,
                 max_new_tokens=self.max_new_tokens,
                 do_sample=False,
-                use_cache=True
+                use_cache=True,
             )
 
-            answer = self.tokenizer.decode(outputs[0].cpu().tolist(), skip_special_tokens=True)
+            answer = self.tokenizer.decode(
+                outputs[0].cpu().tolist(), skip_special_tokens=True
+            )
             return answer
         finally:
             # Clean up temporary directory
@@ -559,20 +627,20 @@ class QwenClient(BaseModelClient):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         model_id = "Qwen/Qwen2-VL-2B-Instruct"
-        
+
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_compute_dtype=torch.bfloat16,
             bnb_4bit_use_double_quant=True,
         )
-        
+
         self.model = Qwen2VLForConditionalGeneration.from_pretrained(
             model_id,
             torch_dtype=torch.bfloat16,
             # quantization_config=quantization_config,
             attn_implementation="flash_attention_2",
-            device_map="auto"
+            device_map="auto",
         )
         self.processor = AutoProcessor.from_pretrained(model_id)
 
@@ -582,10 +650,15 @@ class QwenClient(BaseModelClient):
         eval_episode: Episode,
         context_episodes: List[Episode],
     ) -> str:
-        
+
         pil_images = []
-        messages = [{"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]}]
-        
+        messages = [
+            {
+                "role": "system",
+                "content": [{"type": "text", "text": "You are a helpful assistant."}],
+            }
+        ]
+
         # Initial prompt
         user_content = [{"type": "text", "text": prompt}]
 
@@ -605,32 +678,50 @@ class QwenClient(BaseModelClient):
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
-            user_content.append({"type": "text", "text": f"Example episode {ctx_episode_idx+1}. Instruction: {context_episode.instruction}\n"})
-            
-            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
-                user_content.extend([
-                    {"type": "text", "text": f"Frame {i+1}: "},
-                    _process_and_get_image_content(frame),
-                    {"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}% \n"}
-                ])
+            user_content.append(
+                {
+                    "type": "text",
+                    "text": f"Example episode {ctx_episode_idx+1}. Instruction: {context_episode.instruction}\n",
+                }
+            )
 
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
+                user_content.extend(
+                    [
+                        {"type": "text", "text": f"Frame {i+1}: "},
+                        _process_and_get_image_content(frame),
+                        {
+                            "type": "text",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}% \n",
+                        },
+                    ]
+                )
 
         # Add query instruction
-        user_content.append({"type": "text", "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%'n"})
+        user_content.append(
+            {
+                "type": "text",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%'n",
+            }
+        )
 
         # Add query images
         for i, frame in enumerate(eval_episode.frames, 1):
-            user_content.extend([
-                {"type": "text", "text": f"Frame {i}: "},
-                _process_and_get_image_content(frame)
-                ])
-        
+            user_content.extend(
+                [
+                    {"type": "text", "text": f"Frame {i}: "},
+                    _process_and_get_image_content(frame),
+                ]
+            )
+
         messages.append({"role": "user", "content": user_content})
 
         text = self.processor.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
-        
+
         print(f"Text: {text}")
         inputs = self.processor(
             text=[text],
@@ -640,24 +731,29 @@ class QwenClient(BaseModelClient):
         )
         inputs = inputs.to(self.device)
 
-        generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
+        generated_ids = self.model.generate(
+            **inputs, max_new_tokens=self.max_new_tokens
+        )
         generated_ids_trimmed = [
-            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+            out_ids[len(in_ids) :]
+            for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]
-        response = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True)[0]
+        response = self.processor.batch_decode(
+            generated_ids_trimmed, skip_special_tokens=True
+        )[0]
         return response
 
 
 class GemmaClient(BaseModelClient):
     """Gemma client implementation"""
 
-    def __init__(self):
-        if torch is None:
-            raise ImportError("PyTorch and transformers not installed")
+    def __init__(self, model_id: str = "google/gemma-3-4b-it"):
 
-        model_id = "google/gemma-3-1b-it"
-        self.model = Gemma3ForCausalLM.from_pretrained(model_id, device_map="auto").eval()
-        self.processor = AutoTokenizer.from_pretrained(model_id)
+        logger.info(f"Loading Gemma model {model_id}...")
+        self.model = Gemma3ForConditionalGeneration.from_pretrained(
+            model_id, device_map="auto"
+        ).eval()
+        self.processor = AutoProcessor.from_pretrained(model_id)
 
     def generate_response(
         self,
@@ -668,44 +764,51 @@ class GemmaClient(BaseModelClient):
 
         # Build messages for Gemma following GPT4o structure exactly
         messages = [
-            {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
+                    {"type": "text", "text": "Initial robot scene:"},
+                    {
+                        "type": "image",
+                        "image": self._to_pil(eval_episode.starting_frame),
+                    },
+                    {
+                        "type": "text",
+                        "text": "In the initial robot scene, the task completion percentage is 0.",
+                    },
                 ],
-            },
+            }
         ]
-
-        # Add initial scene
-        messages[1]["content"].extend(
-            [
-                {"type": "text", "text": "Initial robot scene:"},
-                {"type": "image", "base64": self.encode_image(eval_episode.starting_frame)},
-                {"type": "text", "text": "In the initial robot scene, the task completion percentage is 0."},
-            ]
-        )
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
-            messages[1]["content"].extend(
+            messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
-                    {"type": "text", "text": f"Instruction: {context_episode.instruction}"},
+                    {
+                        "type": "text",
+                        "text": f"Instruction: {context_episode.instruction}",
+                    },
                 ]
             )
 
-            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
-                messages[1]["content"].extend(
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
+                messages[0]["content"].extend(
                     [
                         {"type": "text", "text": f"Frame {i+1}: "},
                         {"type": "image", "base64": self.encode_image(frame)},
-                        {"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}%"},
+                        {
+                            "type": "text",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
+                        },
                     ]
                 )
 
         # Add query instruction
-        messages[1]["content"].append(
+        messages[0]["content"].append(
             {
                 "type": "text",
                 "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
@@ -714,25 +817,35 @@ class GemmaClient(BaseModelClient):
 
         # Add query images
         for i, frame in enumerate(eval_episode.frames, 1):
-            messages[1]["content"].extend(
+            messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Frame {i}: "},
-                    {"type": "image", "base64": self.encode_image(frame)}
+                    {"type": "image", "base64": self.encode_image(frame)},
                 ]
             )
 
         inputs = self.processor.apply_chat_template(
-            messages, 
-            padding=True, 
-            add_generation_prompt=True, 
-            tokenize=True, 
-            return_dict=True, 
-            return_tensors="pt"
-        ).to(self.model.device)
+            messages,
+            add_generation_prompt=True,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt",
+        ).to(self.model.device, dtype=torch.bfloat16)
 
-        output = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
-        decoded_outputs = self.processor.batch_decode(output, skip_special_tokens=True)
-        return decoded_outputs[0]
+        input_len = inputs["input_ids"].shape[-1]
+        print(f"Token length: {input_len}")
+
+        if input_len > 32000:
+            raise ValueError(
+                f"Input length {input_len} exceeds maximum allowed length of 32000 tokens."
+            )
+
+        with torch.inference_mode():
+            output = self.model.generate(**inputs, max_new_tokens=1024, do_sample=False)
+            output = output[0][input_len:]
+
+        decoded_outputs = self.processor.decode(output, skip_special_tokens=True)
+        return decoded_outputs
 
 
 class GeminiClient(BaseModelClient):
@@ -755,17 +868,30 @@ class GeminiClient(BaseModelClient):
 
         # Add initial scene
         contents.append("Initial robot scene:")
-        contents.append(types.Part.from_bytes(data=self.encode_image(eval_episode.starting_frame), mime_type="image/png"))
-        contents.append("In the initial robot scene, the task completion percentage is 0.")
+        contents.append(
+            types.Part.from_bytes(
+                data=self.encode_image(eval_episode.starting_frame),
+                mime_type="image/png",
+            )
+        )
+        contents.append(
+            "In the initial robot scene, the task completion percentage is 0."
+        )
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
             contents.append(f"Example episode {ctx_episode_idx+1}.")
             contents.append(f"Instruction: {context_episode.instruction}")
-            
-            for i, (task_completion, frame) in enumerate(zip(context_episode.task_completion_predictions, context_episode.frames)):
+
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
                 contents.append(f"Frame {i+1}: ")
-                contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
+                contents.append(
+                    types.Part.from_bytes(
+                        data=self.encode_image(frame), mime_type="image/png"
+                    )
+                )
                 contents.append(f"Task Completion Percentage: {task_completion:.1f}%")
 
         # Add query instruction
@@ -776,9 +902,15 @@ class GeminiClient(BaseModelClient):
         # Add query images
         for i, frame in enumerate(eval_episode.frames, 1):
             contents.append(f"Frame {i}: ")
-            contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
+            contents.append(
+                types.Part.from_bytes(
+                    data=self.encode_image(frame), mime_type="image/png"
+                )
+            )
 
-        response = self.client.models.generate_content(model=self.model_name, contents=contents)
+        response = self.client.models.generate_content(
+            model=self.model_name, contents=contents
+        )
         return response.text
 
 

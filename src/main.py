@@ -18,6 +18,24 @@ from models import ModelFactory
 from result_evaluator import ResultEvaluator
 import torch
 
+import random
+import tensorflow as tf
+
+def set_seed(seed: int):
+    """
+    Sets the seed for all relevant random number generators to ensure reproducibility.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # if you are using CUDA
+    tf.random.set_seed(seed)
+    # When running on the CuDNN backend, two further options must be set
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    # Set a fixed value for the hash seed
+    os.environ['PYTHONHASHSEED'] = str(seed)
+
 
 def convert_numpy_types(obj):
     """Convert numpy types to native Python types for JSON serialization"""
@@ -206,6 +224,8 @@ def run_eval(
         resume: bool = False,
     ):
     """Main function to run the data loading and prompt generation."""
+    seed_value = 42
+    set_seed(seed_value)
 
     collector = ResultCollector(
         output_dir=output_dir,
@@ -230,41 +250,40 @@ def run_eval(
         num_frames=max_frames,
         camera_index=camera_index,
     )
-    print(f'Check 2 {torch.cuda.memory_summary()}')
-    client = ModelFactory.create_client(model)
-    print(f'Check 3 {torch.cuda.memory_summary()}')
-    for step in range(start_step, num_eval_steps):
-        # try:
-        example = loader.load_example()
 
-        prompt = utils.get_prompt(example.eval_episode.instruction)
-        print(f'Check 4 {torch.cuda.memory_summary()}')
-        response = client.generate_response(
-            prompt=prompt,
-            eval_episode=example.eval_episode,
-            context_episodes=example.context_episodes,
-        )
-        
-        collector.add_result(
-            step=step + 1,
-            example=example,
-            model_response=response,
-            voc_score=None,
-            extracted_percentages=None,
-            model_name=model
-        )
+    client = ModelFactory.create_client(model)
+
+    for step in range(start_step, num_eval_steps):
+        try:
+            example = loader.load_example()
+
+            prompt = utils.get_prompt(example.eval_episode.instruction)
+            response = client.generate_response(
+                prompt=prompt,
+                eval_episode=example.eval_episode,
+                context_episodes=example.context_episodes,
+            )
             
-        # except Exception as e:
-        #     error_result = {
-        #         "step": step + 1,
-        #         "timestamp": datetime.now().isoformat(),
-        #         "model": model,
-        #         "error": str(e),
-        #         "status": "failed"
-        #     }
-        #     with open(collector.results_file, 'a') as f:
-        #         f.write(json.dumps(error_result) + '\n')
-        #     continue
+            collector.add_result(
+                step=step + 1,
+                example=example,
+                model_response=response,
+                voc_score=None,
+                extracted_percentages=None,
+                model_name=model
+            )
+                
+        except Exception as e:
+            error_result = {
+                "step": step + 1,
+                "timestamp": datetime.now().isoformat(),
+                "model": model,
+                "error": str(e),
+                "status": "failed"
+            }
+            with open(collector.results_file, 'a') as f:
+                f.write(json.dumps(error_result) + '\n')
+            continue
 
     return collector.results_file
 
@@ -351,7 +370,6 @@ if __name__ == "__main__":
             parser.error("--results_file is required when using --batch_eval")
         batch_evaluate_results(args.results_file, args.output_file, args.batch_size)
     else:
-        print(f'Check 1 {torch.cuda.memory_summary()}')
         run_eval(
             args.name, 
             args.model,
