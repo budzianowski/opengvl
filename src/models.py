@@ -13,7 +13,6 @@ from transformers import (AutoModelForImageTextToText, AutoProcessor,
 
 from data_loader import Episode
 
-# third-party imports
 try:
     import openai
 except ImportError:

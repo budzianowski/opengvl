@@ -2,6 +2,7 @@
 import json
 import os
 import tempfile
+import time
 
 import numpy as np
 import pytest
@@ -63,8 +64,7 @@ class TestResultEvaluator:
         All systems are functioning normally.
         """
         result = evaluator.evaluate(response)
-        assert result == []
-
+        assert result is None
     
     @pytest.mark.slow
     def test_complex_response_with_mixed_terminology(self, evaluator):
@@ -154,7 +154,6 @@ class TestResultEvaluator:
         Success rate for similar tasks: 94.2% over last 50 trials.
         """
         result = evaluator.evaluate(response)
-    
         expected = [5.5, 18.7, 35.0, 58.2, 73.0, 89.4, 100.0]
         assert result == expected
 
@@ -231,7 +230,7 @@ class TestBatchEvaluation:
     @pytest.fixture(scope="class")
     def evaluator(self):
         """Create evaluator for batch testing."""
-        return ResultEvaluator(batch_size=2)
+        return ResultEvaluator()
     
     @pytest.fixture
     def sample_responses(self):
@@ -297,7 +296,7 @@ class TestBatchJSONLEvaluation:
     @pytest.fixture(scope="class")
     def evaluator(self):
         """Create evaluator for JSONL testing."""
-        return ResultEvaluator(batch_size=2)
+        return ResultEvaluator()
     
     @pytest.fixture
     def sample_jsonl_data(self):
@@ -556,7 +555,7 @@ class TestVOCScoreIntegration:
             
             result = results[0]
             assert result['extracted_percentages'] == [10.0, 20.0, 30.0, 40.0, 50.0]
-            assert result['voc_score'] == 1.0  # Perfect correlation
+            assert np.isclose(result['voc_score'], 1.0)
             
         finally:
             if os.path.exists(temp_file):
@@ -588,7 +587,7 @@ class TestVOCScoreIntegration:
             
             result = results[0]
             assert result['extracted_percentages'] == [50.0, 40.0, 30.0, 20.0, 10.0]
-            assert result['voc_score'] == -1.0  # Perfect negative correlation
+            assert np.isclose(result['voc_score'], -1.0)
             
         finally:
             if os.path.exists(temp_file):

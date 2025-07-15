@@ -1,14 +1,14 @@
 """ Result Evaluator """
 
 import json
+import logging
 import os
 import re
 import shutil
 import tempfile
 from dataclasses import dataclass
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from google import genai
 
 from voc_score import value_order_correlation
 
@@ -57,69 +57,57 @@ class Result:
 class ResultEvaluator:
     def __init__(
             self,
-            model_name: str = "Qwen/Qwen2.5-1.5B-Instruct",
-            max_new_tokens: int = 300,
-            batch_size: int = 8
+            model_name: str = "gemma-3-27b-it",
         ):
+        self.logger = logging.getLogger(__name__)
         self.model_name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
-        self.max_new_tokens = max_new_tokens
-        self.batch_size = batch_size
+        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         
-        # Set padding token if not set
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-
     def evaluate(self, response: str) -> list[float]:
         """Evaluate the response and return the task completion percentage."""
-        return self.evaluate_batch([response])[0]
+        contents = [{
+            'parts': [{'text': PROMPT}, {'text': response}],
+            'role': 'user'
+        }]
+        result = self.client.models.generate_content(
+            model=self.model_name, contents=contents
+        )
+        return self._extract_task_completion_percentage(result.text)
 
     def evaluate_batch(self, responses: list[str]) -> list[list[float]]:
-        """Evaluate multiple responses in batch and return task completion percentages."""
+        """Evaluate multiple responses in batch and return task completion percentages.
+        
+        Note: the true batching does not work for free-tier setup
+        inline_requests = []
+        for response in responses:
+            inline_requests.append(
+            {
+                'contents': [{
+                        'parts': [{'text': PROMPT}, {'text': response}],
+                        'role': 'user'
+                    }]
+                }
+            )
+
+        inline_batch_job = self.client.batches.create(
+            model=self.model_name,
+            src=inline_requests,
+            config={
+                'display_name': "inlined-requests-job-1",
+            },
+        )
+        """
         if not responses:
             return []
-            
-        # Prepare batch messages
-        batch_messages = []
+
+        batch_results: list[list[float]] = []
         for response in responses:
-            messages = [
-                {"role": "system", "content": PROMPT},
-                {"role": "user", "content": response},
-            ]
-            batch_messages.append(messages)
-        
-        # Apply chat template to all messages
-        batch_inputs = self.tokenizer.apply_chat_template(
-            batch_messages,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-        ).to(self.model.device).to(torch.bfloat16)
-        
-        input_length = batch_inputs.input_ids.shape[1]
-        
-        # Generate responses for the batch
-        with torch.inference_mode():
-            outputs = self.model.generate(
-                **batch_inputs, 
-                max_new_tokens=self.max_new_tokens,
-                pad_token_id=self.tokenizer.pad_token_id,
-                do_sample=False,
-                temperature=None,
-                top_p=None
-            )
-        
-        # Extract new tokens for each response
-        batch_results = []
-        for i, output in enumerate(outputs):
-            new_tokens = output[input_length:]
-            assistant_response = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-            extracted_percentages = self._extract_task_completion_percentage(assistant_response)
-            batch_results.append(extracted_percentages)
+            try:
+                result = self.evaluate(response)
+                batch_results.append(result)
+            except Exception as e:
+                self.logger.error(f"Error evaluating response: {e}")
+                batch_results.append(None)
         
         return batch_results
     
@@ -138,93 +126,37 @@ class ResultEvaluator:
         return None
 
     def batch_evaluate_jsonl(self, jsonl_file: str, output_file: str = None) -> str:
-        """
-        Batch evaluate a JSONL file and update it with extracted percentages and VOC scores.
-        
-        Args:
-            jsonl_file: Path to the input JSONL file
-            output_file: Path to the output JSONL file (if None, overwrites input file)
-            
-        Returns:
-            Path to the updated JSONL file
-        """
-        results = []
-        
-        # Read existing results
+        results: list[dict[str, any]] = []
         with open(jsonl_file, 'r') as f:
             for line in f:
-                if line.strip():
-                    result = json.loads(line)
-                    results.append(result)
+                line = line.strip()
+                if not line:
+                    continue
+                results.append(json.loads(line))
 
-        # Filter results that need processing
-        results_to_process = []
-        results_indices = []
-        
         for i, result in enumerate(results):
             if 'error' in result or 'status' in result:
                 continue
-                
-            # Skip if already processed and has valid extracted_percentages and voc_score
-            if (result.get('extracted_percentages') is not None and 
-                result.get('voc_score') is not None):
+            if result.get('extracted_percentages') is not None and result.get('voc_score') is not None:
                 continue
-                
             model_response = result.get('model_response', '')
             if not model_response:
                 continue
-                
-            results_to_process.append(result)
-            results_indices.append(i)
-        
-        if not results_to_process:
-            print("No results need processing")
-            return output_file
-
-        # Process in batches
-        updated_count = 0
-        for batch_start in range(0, len(results_to_process), self.batch_size):
-            batch_end = min(batch_start + self.batch_size, len(results_to_process))
-            batch_results = results_to_process[batch_start:batch_end]
-            batch_indices = results_indices[batch_start:batch_end]
-            
-            # Extract responses for this batch
-            batch_responses = [result['model_response'] for result in batch_results]
-            
-            try:
-                # Process batch
-                batch_extracted_percentages = self.evaluate_batch(batch_responses)
-                
-                # Update results
-                for j, (result_idx, extracted_percentages) in enumerate(zip(batch_indices, batch_extracted_percentages)):
-                    original_result = results[result_idx]
-                    original_result['extracted_percentages'] = extracted_percentages
-                    
-                    # Calculate VOC score if we have valid percentages
+            extracted_percentages = self.evaluate(model_response)
+            result['extracted_percentages'] = extracted_percentages
+            voc_score = None
+            ground_truth = result.get('ground_truth_percentages')
+            if extracted_percentages is not None and ground_truth is not None and len(extracted_percentages) == len(ground_truth):
+                try:
+                    voc_score = value_order_correlation(extracted_percentages, ground_truth)
+                except Exception as e:
+                    self.logger.error(f"Error calculating VOC score for result {i}: {e}")
                     voc_score = None
-                    ground_truth = original_result.get('ground_truth_percentages')
+            result['voc_score'] = voc_score
 
-                    if (extracted_percentages is not None and 
-                        ground_truth is not None and 
-                        len(extracted_percentages) == len(ground_truth)):
-                        try:
-                            voc_score = value_order_correlation(extracted_percentages, ground_truth)
-                        except Exception as e:
-                            print(f"Error calculating VOC score for result {result_idx}: {e}")
-                            voc_score = None
-                    
-                    original_result['voc_score'] = voc_score
-                    updated_count += 1
+        if output_file is None:
+            output_file = jsonl_file
 
-            except Exception as e:
-                print(f"Error processing batch {batch_start}-{batch_end}: {e}")
-                # Set None values for failed batch
-                for result_idx in batch_indices:
-                    results[result_idx]['extracted_percentages'] = None
-                    results[result_idx]['voc_score'] = None
-                continue
-        
-        # Write updated results
         if output_file == jsonl_file:
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.jsonl') as tmp_f:
                 temp_file = tmp_f.name
@@ -235,7 +167,6 @@ class ResultEvaluator:
             with open(output_file, 'w') as f:
                 for result in results:
                     f.write(json.dumps(result) + '\n')
-        
         return output_file
 
 
@@ -253,4 +184,17 @@ if __name__ == "__main__":
     Frame 9: 8.0%
     Frame 10: 61.0%
     """)
+    print(result)
+    result = result_evaluator.evaluate_batch(["""
+    Frame 1: 61.0%
+    Frame 2: 41.0%
+    Frame 3: 24.0%
+    Frame 4: 93.0%
+    Frame 5: 33.0%
+    Frame 6: 45.0%
+    Frame 7: 44.0%
+    Frame 8: 82.0%
+    Frame 9: 8.0%
+    Frame 10: 61.0%
+    """])
     print(result)
