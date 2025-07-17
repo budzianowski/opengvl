@@ -1,40 +1,23 @@
-""" Example script to produce GVL predictions.
+"""Example script to produce GVL predictions.
 
 Run:
-    python src/main.py --name lerobot/fmb --max_frames 4 --num_context_episodes 2 --model internvl
-    python src/main.py --batch_eval --results_file results/experiment_results.jsonl
+    python src/main.py --config-path configs/example.json
 """
 
 import argparse
 import json
 import os
+import random
 from datetime import datetime
 
 import numpy as np
+import torch
+from loguru import logger
 
 import utils
 from data_loader import DataLoader
 from models import ModelFactory
 from result_evaluator import ResultEvaluator
-import torch
-
-import random
-import tensorflow as tf
-
-def set_seed(seed: int):
-    """
-    Sets the seed for all relevant random number generators to ensure reproducibility.
-    """
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)  # if you are using CUDA
-    tf.random.set_seed(seed)
-    # When running on the CuDNN backend, two further options must be set
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    # Set a fixed value for the hash seed
-    os.environ['PYTHONHASHSEED'] = str(seed)
 
 
 def convert_numpy_types(obj):
@@ -54,27 +37,29 @@ def convert_numpy_types(obj):
 
 class ResultCollector:
     def __init__(
-            self, 
-            output_dir: str = "results", 
-            experiment_name: str = None,
-            name: str = None,
-            model: str = None,
-            num_context_episodes: int = None,
-            max_frames: int = None,
-            num_eval_steps: int = None,
-            camera_index: int = None,
-        ):
+        self,
+        output_dir: str = "results",
+        experiment_name: str = None,
+        name: str = None,
+        model: str = None,
+        num_context_episodes: int = None,
+        max_frames: int = None,
+        num_eval_steps: int = None,
+        camera_index: int = None,
+    ):
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
-        
+
         if experiment_name is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            experiment_name = f"gvl_eval_{timestamp}"
-        
-        self.experiment_name = experiment_name
-        self.results_file = os.path.join(output_dir, f"{experiment_name}_results.jsonl")
-        self.summary_file = os.path.join(output_dir, f"{experiment_name}_summary.json")
-        
+            self.experiment_name = f"gvl_eval_{timestamp}"
+        else:
+            self.experiment_name = experiment_name + f'_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+
+        logger.info(f"Saving results to {output_dir}/{self.experiment_name}_results.jsonl")
+        self.results_file = os.path.join(output_dir, f"{self.experiment_name}_results.jsonl")
+        self.summary_file = os.path.join(output_dir, f"{self.experiment_name}_summary.json")
+
         self.results = []
         self.experiment_config = {}
 
@@ -87,20 +72,20 @@ class ResultCollector:
             "camera_index": camera_index,
         }
         self.set_config(self.config)
-    
+
     def set_config(self, config: dict[str, any]):
         """Store experiment configuration"""
         self.experiment_config = config
         self._save_summary()
-    
-    def add_result(self, step: int, example, model_response: str, voc_score: float, 
-                   extracted_percentages: list, model_name: str):
+
+    def add_result(
+        self, step: int, example, model_response: str, voc_score: float, extracted_percentages: list, model_name: str
+    ):
         """Add a single evaluation result"""
         result = {
             "step": step,
             "timestamp": datetime.now().isoformat(),
             "model": model_name,
-            
             "eval_episode": {
                 "episode_index": example.eval_episode.episode_index,
                 "instruction": example.eval_episode.instruction,
@@ -108,7 +93,6 @@ class ResultCollector:
                 "shuffled_frames_indices": example.eval_episode.shuffled_frames_indices,
                 "ground_truth_completion": example.eval_episode.task_completion_predictions,
             },
-            
             "context_episodes": [
                 {
                     "episode_index": ctx_ep.episode_index,
@@ -119,12 +103,10 @@ class ResultCollector:
                 }
                 for ctx_ep in example.context_episodes
             ],
-            
             "model_response": model_response,
             "extracted_percentages": extracted_percentages,
             "ground_truth_percentages": example.eval_episode.task_completion_predictions,
             "voc_score": voc_score,
-            
             "frame_mapping": {
                 "shuffled_to_original": {
                     shuffled_idx: example.eval_episode.original_frames_indices[
@@ -135,23 +117,22 @@ class ResultCollector:
                 "original_to_completion": {
                     orig_idx: completion
                     for orig_idx, completion in zip(
-                        example.eval_episode.original_frames_indices,
-                        example.eval_episode.task_completion_predictions
+                        example.eval_episode.original_frames_indices, example.eval_episode.task_completion_predictions
                     )
-                }
-            }
+                },
+            },
         }
-        
+
         self.results.append(result)
         self._save_result(result)
         self._update_summary()
-    
+
     def _save_result(self, result: dict[str, any]):
         """Append single result to JSONL file"""
-        with open(self.results_file, 'a') as f:
+        with open(self.results_file, "a") as f:
             serializable_result = convert_numpy_types(result)
-            f.write(json.dumps(serializable_result) + '\n')
-    
+            f.write(json.dumps(serializable_result) + "\n")
+
     def _save_summary(self):
         """Save experiment summary and config"""
         summary = {
@@ -161,7 +142,7 @@ class ResultCollector:
             "total_steps": len(self.results),
             "created_at": datetime.now().isoformat(),
         }
-        
+
         if self.results:
             voc_scores = [r["voc_score"] for r in self.results if r["voc_score"] is not None]
             if voc_scores:
@@ -172,29 +153,30 @@ class ResultCollector:
                     "num_valid_scores": len(voc_scores),
                     "num_total_results": len(self.results),
                 }
-        
-        with open(self.summary_file, 'w') as f:
+
+        with open(self.summary_file, "w") as f:
             json.dump(summary, f, indent=2)
-    
+
     def _update_summary(self):
         """Update summary with latest statistics"""
         self._save_summary()
-    
+
     def load_existing_results(self):
         """Load existing results from JSONL file if it exists"""
+        logger.info(f"Loading existing results from {self.results_file}...")
         if os.path.exists(self.results_file):
-            with open(self.results_file, 'r') as f:
+            with open(self.results_file, "r") as f:
                 for line in f:
                     if line.strip():
                         self.results.append(json.loads(line))
-            print(f"Loaded {len(self.results)} existing results from {self.results_file}")
+            logger.info(f"Loaded {len(self.results)} existing results from {self.results_file}")
         return len(self.results)
 
 
 def batch_evaluate_results(results_file: str, output_file: str = None, batch_size: int = 8):
     """
     Run batch evaluation on an existing results file.
-    
+
     Args:
         results_file: Path to the JSONL results file
         output_file: Path to save updated results (if None, overwrites input file)
@@ -202,30 +184,28 @@ def batch_evaluate_results(results_file: str, output_file: str = None, batch_siz
     """
     if not os.path.exists(results_file):
         raise FileNotFoundError(f"Results file not found: {results_file}")
-    
-    print(f"Starting batch evaluation of {results_file} with batch size {batch_size}")
-    
+
+    logger.info(f"Starting batch evaluation of {results_file} with batch size {batch_size}")
+
     result_evaluator = ResultEvaluator(batch_size=batch_size)
     updated_file = result_evaluator.batch_evaluate_jsonl(results_file, output_file)
-    
-    print(f"Batch evaluation completed. Updated file: {updated_file}")
+
+    logger.info(f"Batch evaluation completed. Updated file: {updated_file}")
     return updated_file
 
 
 def run_eval(
-        name: str,
-        model: str = "gpt4o",
-        num_context_episodes: int = 2,
-        max_frames: int = 10,
-        num_eval_steps: int = 5,
-        camera_index: int = 0,
-        output_dir: str = "results",
-        experiment_name: str = None,
-        resume: bool = False,
-    ):
+    name: str,
+    model: str = "google/gemma-3-4b-it",
+    num_context_episodes: int = 2,
+    max_frames: int = 10,
+    num_eval_steps: int = 5,
+    camera_index: int = 0,
+    output_dir: str = "results",
+    experiment_name: str = None,
+    resume: bool = False,
+):
     """Main function to run the data loading and prompt generation."""
-    seed_value = 42
-    set_seed(seed_value)
 
     collector = ResultCollector(
         output_dir=output_dir,
@@ -240,10 +220,11 @@ def run_eval(
 
     start_step = 0
     if resume:
+        logger.info("Resuming from existing results...")
         start_step = collector.load_existing_results()
         if start_step >= num_eval_steps:
             return collector.results_file
-    
+
     loader = DataLoader(
         dataset_name=name,
         num_context_episodes=num_context_episodes,
@@ -251,133 +232,85 @@ def run_eval(
         camera_index=camera_index,
     )
 
+    logger.info(f"Loading examples for {num_eval_steps} evaluation steps...")
+    examples = loader.load_examples(num_eval_steps)
+
+    logger.info("Creating model client...")
     client = ModelFactory.create_client(model)
 
-    for step in range(start_step, num_eval_steps):
+    for step, example in enumerate(examples):
+        logger.info(f"Processing step {step + 1}/{num_eval_steps}...")
         try:
-            example = loader.load_example()
 
             prompt = utils.get_prompt(example.eval_episode.instruction)
+            logger.info(f"Waiting for model response ...")
+            generating_start = datetime.now()
             response = client.generate_response(
                 prompt=prompt,
                 eval_episode=example.eval_episode,
                 context_episodes=example.context_episodes,
             )
-            
+            generating_duration = datetime.now() - generating_start
+            logger.info(f"Model response received in {generating_duration.total_seconds()} seconds.")
+
             collector.add_result(
                 step=step + 1,
                 example=example,
                 model_response=response,
                 voc_score=None,
                 extracted_percentages=None,
-                model_name=model
+                model_name=model,
             )
-                
+
         except Exception as e:
+            logger.error(f"Error processing step {step + 1}: {e}")
             error_result = {
                 "step": step + 1,
                 "timestamp": datetime.now().isoformat(),
                 "model": model,
                 "error": str(e),
-                "status": "failed"
+                "status": "failed",
             }
-            with open(collector.results_file, 'a') as f:
-                f.write(json.dumps(error_result) + '\n')
+            with open(collector.results_file, "a") as f:
+                f.write(json.dumps(error_result) + "\n")
             continue
 
     return collector.results_file
 
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser()
-    
-    # Batch evaluation mode
-    parser.add_argument(
-        "--batch_eval",
-        action="store_true",
-        help="Run batch evaluation on existing results file"
-    )
-    parser.add_argument(
-        "--results_file",
-        type=str,
-        help="Path to results JSONL file for batch evaluation"
-    )
-    parser.add_argument(
-        "--output_file",
-        type=str,
-        help="Path to save updated results (if not specified, overwrites input file)"
-    )
-    parser.add_argument(
-        "--batch_size",
-        type=int,
-        default=8,
-        help="Batch size for model inference during batch evaluation",
-    )
-    
-    # Regular evaluation mode arguments
-    parser.add_argument("--name", type=str, default="lerobot/fmb", help="Dataset name")
-    parser.add_argument(
-        "--max_frames", 
-        type=int, default=10, 
-        help="Maximum number of frames to select per episode"
-    )
-    parser.add_argument(
-        "--num_eval_steps", 
-        type=int, 
-        default=5, 
-        help="Number of evaluation steps to run"
-    )
-    parser.add_argument(
-        "--num_context_episodes", 
-        type=int, 
-        default=2, help="Number of context episodes to use"
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="gpt4o",
-        choices=["gpt4o", "internvl", "gemma", "gemini", "smolvlm", "qwen", "deepseek"],
-        help="Model to use for inference",
-    )
-    parser.add_argument(
-        "--camera_index",
-        type=int,
-        default=0,
-        help="Camera index to use",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
-        default="results",
-        help="Directory to save results",
-    )
-    parser.add_argument(
-        "--experiment_name",
-        type=str,
-        default=None,
-        help="Name for the experiment (default: auto-generated)",
-    )
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Resume from existing results file",
-    )
-    
+    parser.add_argument("--config-path", type=str, help="Path to the config file")
     args = parser.parse_args()
-    
-    if args.batch_eval:
-        if not args.results_file:
+    # print current path
+    logger.info(f"Current working directory: {os.getcwd()}")
+
+    try:
+        with open(args.config_path, "r") as f:
+            config = json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load config file {args.config_path}: {e}")
+        exit(1)
+    logger.info(
+        f"Running evaluation on model: {config['model']} on dataset: {config['dataset']} with {config['num_context_episodes']} context episodes and {config['max_frames']} max frames on {config['num_eval_steps']} steps."
+    )
+
+    if config.get("batch_eval"):
+        logger.info(f"Batch evaluation mode enabled. Using results file: {config['results_file']}")
+        if not config.get("results_file"):
             parser.error("--results_file is required when using --batch_eval")
-        batch_evaluate_results(args.results_file, args.output_file, args.batch_size)
+        batch_evaluate_results(config["results_file"], config["output_file"], config["batch_size"])
     else:
+        logger.info("Running regular evaluation...")
         run_eval(
-            args.name, 
-            args.model,
-            args.num_context_episodes, 
-            args.max_frames, 
-            args.num_eval_steps,
-            args.camera_index,
-            args.output_dir,
-            args.experiment_name,
-            args.resume,
+            config["dataset"],
+            config["model"],
+            config["num_context_episodes"],
+            config["max_frames"],
+            config["num_eval_steps"],
+            config["camera_index"],
+            config["output_dir"],
+            config.get("experiment_name"),
+            config.get("resume", False),
         )

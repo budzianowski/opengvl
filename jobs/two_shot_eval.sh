@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=gemma3-4b-two-shot-mutex
-#SBATCH --output=gemma3-4b-two-shot-mutex-%j.out
-#SBATCH --error=gemma3-4b-two-shot-mutex-%j.err
+#SBATCH --job-name=gemma3-12b-two-shot-mutex
+#SBATCH --output=gemma3-12b-two-shot-mutex-%j.out
+#SBATCH --error=gemma3-12b-two-shot-mutex-%j.err
 #SBATCH --time=08:00:00
 #SBATCH --account=plgopenglv-gpu-a100
 #SBATCH --partition=plgrid-gpu-a100
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=48G
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:3
 
 # Set environment variables
 export HF_HOME=/net/pr2/projects/plgrid/plggrobovlm/
@@ -21,9 +21,9 @@ module load Miniconda3
 module load CUDA/12.1.1
 eval "$(conda shell.bash hook)"
 conda activate gvl_cuda
-
 # Run the command
 
 # lerobot/fmb, lerobot/utaustin_mutex, lerobot/toto
 
-python src/main.py --name lerobot/utaustin_mutex --max_frames 20 --model gemma --num_eval_steps 200 --num_context_episodes 2
+python src/main.py --name lerobot/utaustin --max_frames 20 --model gemma --num_eval_steps 200 --num_context_episodes 2
+_mutex

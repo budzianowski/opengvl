@@ -1,4 +1,4 @@
-""" Value-Order Correlation (VOC) score """
+"""Value-Order Correlation (VOC) score"""
 
 import re
 
@@ -19,9 +19,9 @@ def value_order_correlation(values: list[int], true_values: list[int]):
     """
     if true_values is None:
         raise ValueError("true_values cannot be None")
-    
+
     if len(values) != len(true_values):
         raise ValueError("values and true_values must have the same length")
-    
+
     voc, _ = spearmanr(values, true_values)
     return voc
