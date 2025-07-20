@@ -27,6 +27,7 @@ from transformers import (
 )
 
 from data_loader import Episode
+from vllm import LLM, SamplingParams
 
 # third-party imports
 try:
@@ -199,6 +200,126 @@ class GemmaClient(BaseModelClient):
         decoded_outputs = self.processor.decode(output, skip_special_tokens=True)
         return decoded_outputs
 
+
+class KimiThinkingClient(BaseModelClient):
+    """Kimi Thinking client implementation"""
+
+    def __init__(self, model_id: str = "moonshotai/Kimi-VL-A3B-Thinking-2506"):
+
+        logger.info(f"Loading Kimi Thinking model {model_id}...")
+        self.model = LLM(
+            model_id,
+            trust_remote_code=True,
+            max_num_seqs=8,
+            max_model_len=131072,
+            limit_mm_per_prompt={"image": 256}
+        )
+
+        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        self.sampling_params = SamplingParams(max_tokens=32768, temperature=0.8)
+
+    def extract_thinking_and_summary(self, text: str, bot: str = "◁think▷", eot: str = "◁/think▷") -> str:
+        if bot in text and eot not in text:
+            return ""
+        if eot in text:
+            return text[text.index(bot) + len(bot):text.index(eot)].strip(), text[text.index(eot) + len(eot) :].strip()
+        return "", text
+
+    def generate_response(
+        self,
+        prompt: str,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
+        ) -> str:
+
+        # Build messages for Gemma following GPT4o structure exactly
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": "Initial robot scene:"},
+                    {
+                        "type": "image",
+                        "image": self._to_pil(eval_episode.starting_frame),
+                    },
+                    {
+                        "type": "text",
+                        "text": "In the initial robot scene, the task completion percentage is 0.",
+                    },
+                ],
+            }
+        ]
+
+        # Add example images with completion percentages
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
+            messages[0]["content"].extend(
+                [
+                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
+                    {
+                        "type": "text",
+                        "text": f"Instruction: {context_episode.instruction}",
+                    },
+                ]
+            )
+
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
+                messages[0]["content"].extend(
+                    [
+                        {"type": "text", "text": f"Frame {i+1}: "},
+                        {"type": "image", "base64": self._to_pil(frame)},
+                        {
+                            "type": "text",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
+                        },
+                    ]
+                )
+
+        # Add query instruction
+        messages[0]["content"].append(
+            {
+                "type": "text",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%\n",
+            }
+        )
+
+        # Add query images
+        for i, frame in enumerate(eval_episode.frames, 1):
+            messages[0]["content"].extend(
+                [
+                    {"type": "text", "text": f"Frame {i}: "},
+                    {"type": "image", "base64": self._to_pil(frame)},
+                ]
+            )
+
+
+        inputs = self.processor.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            tokenize=True,
+            return_dict=True,
+            return_tensors="pt",
+        )
+
+        input_len = inputs["input_ids"].shape[-1]
+
+        if input_len > 128_000:
+            raise ValueError(f"Input length {input_len} exceeds maximum allowed length of 128000 tokens.")
+        logger.info(f"Input length: {input_len}")
+
+        # TODO: Fix input to model below
+        outputs = self.model.generate([{"prompt": text, "multi_modal_data": {"image": image}}], sampling_params=self.sampling_params)
+        generated_text = outputs[0].outputs[0].text
+
+
+        OUTPUT_FORMAT = "--------Thinking--------\n{thinking}\n\n--------Summary--------\n{summary}"
+
+        thinking, summary = self.extract_thinking_and_summary(generated_text)
+        result = OUTPUT_FORMAT.format(thinking=thinking, summary=summary)
+
+        return result
 
 class ModelFactory:
     """Factory class to create model clients"""

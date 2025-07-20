@@ -106,6 +106,7 @@ class DataLoader:
 
             shuffled_indices = self.rng.permutation(len(context_frames_indices))
             shuffled_frames = [selected_frames[i] for i in shuffled_indices]
+            shuffles_completion_prediction = completion_prediction[shuffled_indices]
 
             episode = Episode(
                 starting_frame=frames[0],
@@ -113,7 +114,7 @@ class DataLoader:
                 episode_index=episode_index,
                 original_frames_indices=context_frames_indices.tolist(),
                 shuffled_frames_indices=shuffled_indices.tolist(),
-                task_completion_predictions=completion_prediction.tolist(),
+                task_completion_predictions= shuffles_completion_prediction.tolist(),
                 frames=shuffled_frames,
             )
             episodes.append(episode)

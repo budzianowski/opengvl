@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=gemma3-12b-zero-shot-mutex
-#SBATCH --output=slurm_outputs/gemma3-12b-zero-shot-mutex-%j.out
+#SBATCH --job-name=gemma3-12b-two-shot-toto
+#SBATCH --output=slurm_outputs/gemma3-12b-two-shot-toto-%j.out
 #SBATCH --time=08:00:00
 #SBATCH --account=plgopenglv-gpu-a100
 #SBATCH --partition=plgrid-gpu-a100
@@ -20,4 +20,4 @@ module load Miniconda3
 eval "$(conda shell.bash hook)"
 conda activate open_gvl2
 
-python src/main.py --config-path configs/gemma3-12b-0shot-mutex.json
+python src/main.py --config-path configs/gemma3-12b-2shot-toto.json

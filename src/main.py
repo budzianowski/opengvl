@@ -17,7 +17,7 @@ from loguru import logger
 import utils
 from data_loader import DataLoader
 from models import ModelFactory
-from result_evaluator import ResultEvaluator
+# from result_evaluator import ResultEvaluator
 
 
 def convert_numpy_types(obj):
@@ -187,8 +187,8 @@ def batch_evaluate_results(results_file: str, output_file: str = None, batch_siz
 
     logger.info(f"Starting batch evaluation of {results_file} with batch size {batch_size}")
 
-    result_evaluator = ResultEvaluator(batch_size=batch_size)
-    updated_file = result_evaluator.batch_evaluate_jsonl(results_file, output_file)
+    # result_evaluator = ResultEvaluator(batch_size=batch_size)
+    # updated_file = result_evaluator.batch_evaluate_jsonl(results_file, output_file)
 
     logger.info(f"Batch evaluation completed. Updated file: {updated_file}")
     return updated_file
