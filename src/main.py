@@ -204,6 +204,7 @@ def run_eval(
     output_dir: str = "results",
     experiment_name: str = None,
     resume: bool = False,
+    shuffle: bool = False,
 ):
     """Main function to run the data loading and prompt generation."""
 
@@ -230,6 +231,7 @@ def run_eval(
         num_context_episodes=num_context_episodes,
         num_frames=max_frames,
         camera_index=camera_index,
+        shuffle=shuffle,
     )
 
     logger.info(f"Loading examples for {num_eval_steps} evaluation steps...")

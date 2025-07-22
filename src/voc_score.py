@@ -30,6 +30,10 @@ class VOCScorer:
         # The chronological order is just an increasing sequence.
         chronological_order = np.arange(T)
 
+        # if all predictions are the same, return 0 to avoid division by zero
+        if np.all(predicted_values == predicted_values[0]):
+            return 0.0
+
         # The spearmanr function directly computes the rank-order correlation.
         voc_score, _ = spearmanr(predicted_values, chronological_order)
 
@@ -53,6 +57,8 @@ class VOCScorer:
 
                 preds = rec.get("extracted_percentages", [])
                 shuffled_indices = rec.get("eval_episode", {}).get("shuffled_frames_indices")
+
+                print(preds)
 
                 # --- Validation ---
                 if not preds:
@@ -140,7 +146,7 @@ class VOCScorer:
 
 
 if __name__ == "__main__":
-    FILE_PATH = Path("/home/gracjan/projects/le_robots/gemma3-12b-2shot-mutex_20250720_161317_results_mapped.jsonl") # Replace with your actual file path
+    FILE_PATH = Path("/net/pr2/projects/plgrid/plggrobovlm/ew/opengvl/results/gpt4o-2shot-toto_20250721_220815_results_processed.jsonl") # Replace with your actual file path
 
     scorer = VOCScorer()
 
@@ -159,7 +165,7 @@ if __name__ == "__main__":
         print("--------------------------\n")
 
 
-        scorer.plot_histogram(save_path="voc_distribution.png", title=f"VOC Score Distribution for {FILE_PATH.name}")
+        scorer.plot_histogram(save_path="voc_distributiongpt4o.png", title=f"VOC Score Distribution for {FILE_PATH.name}")
 
     except FileNotFoundError as e:
         print(e)

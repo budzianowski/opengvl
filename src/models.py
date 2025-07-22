@@ -25,7 +25,7 @@ from transformers import (
     BitsAndBytesConfig,
     Gemma3ForConditionalGeneration,
 )
-
+from dotenv import load_dotenv
 from data_loader import Episode
 from vllm import LLM, SamplingParams
 
@@ -35,15 +35,12 @@ try:
 except ImportError:
     openai = None
 
-
-IMAGENET_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_STD = (0.229, 0.224, 0.225)
-
+load_dotenv()
 
 class BaseModelClient:
     """Base class for all model clients"""
 
-    max_new_tokens = 1000
+    max_new_tokens = 1024
 
     @abstractmethod
     def generate_response(
@@ -58,16 +55,20 @@ class BaseModelClient:
     def _to_pil(self, image) -> Image.Image:
         """Convert image to PIL Image."""
         if isinstance(image, Image.Image):
+            print("Image is already a PIL Image")
             return image
 
         # Convert tensor to numpy if needed
         if hasattr(image, "detach"):  # PyTorch tensor
             if image.is_cuda:
                 image = image.cpu()
+
+            print(f"Converting image of type {type(image)} to PIL Image...")
             image = image.detach().numpy()
 
         # Handle different numpy array formats
         if isinstance(image, np.ndarray):
+            print(f"Image shape: {image.shape}, dtype: {image.dtype}")
             # Normalize if values are in [0, 1] range
             if image.dtype == np.float32 or image.dtype == np.float64:
                 if image.max() <= 1.0:
@@ -98,6 +99,115 @@ class BaseModelClient:
         buffer = io.BytesIO()
         pil_image.save(buffer, format="PNG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+class OpenAIClient(BaseModelClient):
+    """OpenAI client implementation"""
+
+    def __init__(self, model_id: str = "gpt-4o-mini", detail: str = "high"):
+        if openai is None:
+            raise ImportError("OpenAI library is not installed. Please install it with 'pip install openai'.")
+
+        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.model_id = model_id
+        self.detail = detail
+        logger.info(f"Using OpenAI model {self.model_id}")
+
+    def generate_response(
+        self,
+        prompt: str,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
+    ) -> str:
+        """Generate response using OpenAI API"""
+        content = [{"type": "input_text", "text": prompt}]
+
+        # Add initial scene
+        content.extend(
+            [
+                {"type": "input_text", "text": "Initial robot scene:"},
+                {
+                    "type": "input_image",
+                    "image_url": f"data:image/png;base64,{self.encode_image(eval_episode.starting_frame)}",
+                    "detail": self.detail,
+                },
+                {
+                    "type": "input_text",
+                    "text": "In the initial robot scene, the task completion percentage is 0.",
+                },
+            ]
+        )
+        # save images to file for debugging (in jpg)
+        # self._to_pil(eval_episode.starting_frame).save("images/initial_scene.jpg", format="JPEG")
+
+
+        # Add example images with completion percentages
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
+            content.extend(
+                [
+                    {"type": "input_text", "text": f"Example episode {ctx_episode_idx+1}."},
+                    {
+                        "type": "input_text",
+                        "text": f"Instruction: {context_episode.instruction}",
+                    },
+                ]
+            )
+
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
+                content.extend(
+                    [
+                        {"type": "input_text", "text": f"Frame {i+1}: "},
+                        {
+                            "type": "input_image",
+                            "image_url": f"data:image/png;base64,{self.encode_image(frame)}",
+                            "detail": self.detail,
+                        },
+                        {
+                            "type": "input_text",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
+                        },
+                    ]
+                )
+                # self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
+
+        # Add query instruction
+        content.append(
+            {
+                "type": "input_text",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
+            }
+        )
+
+        # Add query images
+        for i, frame in enumerate(eval_episode.frames, 1):
+            content.extend(
+                [
+                    {"type": "input_text", "text": f"Frame {i}: "},
+                    {
+                        "type": "input_image",
+                        "image_url": f"data:image/png;base64,{self.encode_image(frame)}",
+                        "detail": self.detail,
+                    },
+                ]
+            )
+            # self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+
+        # save prompt to file for debugging
+        # with open("openai_prompt2.json", "w") as f:
+        #     import json
+        #     json.dump(content, f, indent=2)
+        messages = [{"role": "user", "content": content}]
+
+        response = self.client.responses.create(
+            model=self.model_id,
+            input=messages,
+            max_output_tokens=self.max_new_tokens,
+            temperature=0.0,
+        )
+
+        return response.output_text
 
 
 class GemmaClient(BaseModelClient):
@@ -178,6 +288,10 @@ class GemmaClient(BaseModelClient):
                 ]
             )
 
+    # debugging, save messages to file
+        with open("gemma_messages.json", "w") as f:
+            import json
+            json.dump(messages, f, indent=2)
 
         inputs = self.processor.apply_chat_template(
             messages,
@@ -326,20 +440,9 @@ class ModelFactory:
 
     @staticmethod
     def create_client(model_name: str) -> BaseModelClient:
-        if "internvl" in model_name.lower():
-            return InternVLClient()
-        elif "smolvlm" in model_name.lower():
-            return SmolVLMClient()
-        elif "qwen" in model_name.lower():
-            return QwenClient()
-        elif "deepseek" in model_name.lower():
-            return DeepseekClient()
-        elif "gemma" in model_name.lower():
+        if "gemma" in model_name.lower():
             return GemmaClient()
-        elif "gemini" in model_name.lower():
-            return GeminiClient()
-        elif "gpt4o" in model_name.lower():
-            return GPT4oClient()
-
+        elif "gpt" in model_name.lower():
+            return OpenAIClient()
         else:
             raise ValueError(f"Unknown model: {model_name}")

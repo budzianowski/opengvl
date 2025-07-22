@@ -40,6 +40,7 @@ class DataLoader:
         camera_index: int = 0,
         seed: int = 42,
         max_episodes: int = 500,
+        shuffle: bool = False,
     ):
         """Wrapper around LeRobotDataset to load examples from the dataset.
 
@@ -50,6 +51,7 @@ class DataLoader:
             camera_index: index of the camera to use
             seed: random seed for reproducibility
             max_episodes: maximum number of episodes to consider from the dataset
+            shuffle: whether to shuffle the episode or context frames
         """
         self.ds_meta = LeRobotDatasetMetadata(dataset_name)
         self.dataset_name = dataset_name
@@ -59,6 +61,7 @@ class DataLoader:
         self.seed = seed
         self.rng = np.random.default_rng(seed)
         self.max_episodes = min(max_episodes, self.ds_meta.total_episodes)
+        self.shuffle = shuffle
 
         self._setup_episodes()
 
@@ -97,6 +100,9 @@ class DataLoader:
             else:
                 context_frames_indices = self.rng.choice(range(len(frames)), self.num_frames, replace=False)
 
+            if not self.shuffle:
+                context_frames_indices = np.sort(context_frames_indices)
+
             completion_prediction = (
                 (context_frames_indices / (len(frames) - 1) * 100).astype(int)
                 if len(frames) > 1
@@ -104,9 +110,14 @@ class DataLoader:
             )
             selected_frames = [frames[i] for i in context_frames_indices]
 
-            shuffled_indices = self.rng.permutation(len(context_frames_indices))
-            shuffled_frames = [selected_frames[i] for i in shuffled_indices]
-            shuffles_completion_prediction = completion_prediction[shuffled_indices]
+            if not self.shuffle:
+                shuffled_indices = np.arange(len(context_frames_indices))
+                shuffled_frames = [selected_frames[i] for i in shuffled_indices]
+                shuffles_completion_prediction = completion_prediction[shuffled_indices]
+            else:
+                shuffled_indices = self.rng.permutation(len(context_frames_indices))
+                shuffled_frames = [selected_frames[i] for i in shuffled_indices]
+                shuffles_completion_prediction = completion_prediction[shuffled_indices]
 
             episode = Episode(
                 starting_frame=frames[0],
@@ -115,7 +126,7 @@ class DataLoader:
                 original_frames_indices=context_frames_indices.tolist(),
                 shuffled_frames_indices=shuffled_indices.tolist(),
                 task_completion_predictions= shuffles_completion_prediction.tolist(),
-                frames=shuffled_frames,
+                frames=shuffled_frames
             )
             episodes.append(episode)
         return episodes
@@ -132,7 +143,9 @@ class DataLoader:
         eval_episode_index = self.eval_episode_indices[self.next_eval_idx]
         self.next_eval_idx += 1
 
-        eval_episode = self._load_episodes_from_indices([eval_episode_index])[0]
+        eval_episode = self._load_episodes_from_indices(
+            episode_indices=[eval_episode_index]
+        )[0]
 
         # Create a dedicated, deterministic RNG for context sampling for this specific eval episode.
         # This ensures that for the same eval episode, the context is sampled identically
@@ -146,7 +159,9 @@ class DataLoader:
         num_context = min(self.num_context_episodes, len(shuffled_context_pool))
         context_indices = shuffled_context_pool[:num_context]
 
-        context_episodes = self._load_episodes_from_indices(context_indices.tolist())
+        context_episodes = self._load_episodes_from_indices(
+            episode_indices=context_indices.tolist()
+        )
 
         return Example(eval_episode=eval_episode, context_episodes=context_episodes)
 
@@ -322,3 +337,63 @@ class DataLoader:
 
         plt.tight_layout()
         plt.show()
+
+    # plot for a given episode and for a given frmes like [121, 115, 76, 289, 290, 74, 282, 142, 296, 104, 93, 269, 236, 160, 50, 222, 149, 3, 197, 127]
+
+    def plot_frames(self, episode_index: int, frame_indices: list[int]):
+        """Plots specific frames from a given episode.
+
+        Args:
+            episode_index: The index of the episode to plot.
+            frame_indices: List of frame indices to plot.
+        """
+        logger.info(f"Loading frames {frame_indices} for episode {episode_index}...")
+        dataset = LeRobotDataset(self.dataset_name, episodes=[episode_index])
+        camera_key = dataset.meta.camera_keys[self.camera_index]
+
+        from_idx = dataset.episode_data_index["from"][0].item()
+        to_idx = dataset.episode_data_index["to"][0].item()
+
+        frames = [dataset[index][camera_key] for index in range(from_idx, to_idx)]
+        instruction = dataset[from_idx]["task"]
+
+        selected_frames = [frames[i] for i in frame_indices if i < len(frames)]
+
+        num_frames = len(selected_frames)
+        cols = min(5, num_frames)
+        rows = (num_frames + cols - 1) // cols
+
+        fig, axes = plt.subplots(rows, cols, figsize=(16, 4 * rows))
+        if rows == 1 and cols == 1:
+            axes = [axes]
+        axes = axes.flatten()
+
+        fig.suptitle(f"Selected Frames from Episode {episode_index}: {instruction}", fontsize=16, fontweight="bold")
+
+        for i, frame in enumerate(selected_frames):
+            ax = axes[i]
+            if isinstance(frame, np.ndarray):
+                if frame.dtype == np.uint8:
+                    display_frame = frame
+                else:
+                    display_frame = (frame * 255).astype(np.uint8)
+            else:
+                display_frame = np.array(frame)
+
+            display_frame = display_frame.transpose(1, 2, 0)
+            ax.imshow(display_frame)
+            ax.set_title(f"Frame: {frame_indices[i]}", fontsize=10)
+            ax.axis("off")
+
+        for i in range(num_frames, len(axes)):
+            axes[i].axis("off")
+
+        plt.tight_layout()
+        plt.savefig(f"episode_{episode_index}_frames.png")
+        plt.show()
+
+if __name__ == "__main__":
+    plot_frames(episode_index=50, frame_indices=[121, 115, 76, 289, 290, 74, 282, 142, 296, 104, 93, 269, 236, 160, 50, 222, 149, 3, 197, 127])
+
+
+
