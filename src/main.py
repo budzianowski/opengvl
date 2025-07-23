@@ -17,7 +17,7 @@ from loguru import logger
 import utils
 from data_loader import DataLoader
 from models import ModelFactory
-# from result_evaluator import ResultEvaluator
+from result_evaluator import ResultEvaluator
 
 
 def convert_numpy_types(obj):
@@ -226,6 +226,7 @@ def run_eval(
         if start_step >= num_eval_steps:
             return collector.results_file
 
+    result_evaluator = ResultEvaluator()
     loader = DataLoader(
         dataset_name=name,
         num_context_episodes=num_context_episodes,
@@ -254,13 +255,14 @@ def run_eval(
             )
             generating_duration = datetime.now() - generating_start
             logger.info(f"Model response received in {generating_duration.total_seconds()} seconds.")
-
+            extracted_percentages = result_evaluator.extract_and_validate(response)["prediction"]
+            logger.info(f"Extracted percentages: {extracted_percentages}")
             collector.add_result(
                 step=step + 1,
                 example=example,
                 model_response=response,
                 voc_score=None,
-                extracted_percentages=None,
+                extracted_percentages=extracted_percentages,
                 model_name=model,
             )
 
@@ -315,4 +317,5 @@ if __name__ == "__main__":
             config["output_dir"],
             config.get("experiment_name"),
             config.get("resume", False),
+            config.get("shuffle", False),
         )

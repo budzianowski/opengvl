@@ -1,0 +1,16 @@
+{
+  "dataset": "lerobot/nyu_door_opening_surprising_effectiveness",
+  "model": "gemini-2.5-flash-lite-preview-06-17",
+  "shuffle": false,
+  "num_context_episodes": 1,
+  "max_frames": 20,
+  "num_eval_steps": 1,
+  "camera_index": 0,
+  "output_dir": "results",
+  "experiment_name": null,
+  "resume": false,
+  "batch_eval": false,
+  "results_file": null,
+  "output_file": null,
+  "batch_size": 8
+} 

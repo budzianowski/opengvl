@@ -35,12 +35,18 @@ try:
 except ImportError:
     openai = None
 
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    genai = None
+
 load_dotenv()
 
 class BaseModelClient:
     """Base class for all model clients"""
 
-    max_new_tokens = 10240
+    max_new_tokens = 1024
 
     @abstractmethod
     def generate_response(
@@ -90,6 +96,8 @@ class BaseModelClient:
         else:
             raise ValueError(f"Unsupported image type: {type(image)}")
 
+        # TODO: test this
+        pil_image = pil_image.resize((244, 244))
         return pil_image
 
     def encode_image(self, image) -> str:
@@ -120,6 +128,7 @@ class OpenAIClient(BaseModelClient):
         context_episodes: List[Episode],
     ) -> str:
         """Generate response using OpenAI API"""
+
         content = [{"type": "input_text", "text": prompt}]
 
         # Add initial scene
@@ -129,7 +138,7 @@ class OpenAIClient(BaseModelClient):
                 {
                     "type": "input_image",
                     "image_url": f"data:image/png;base64,{self.encode_image(eval_episode.starting_frame)}",
-                    "detail": self.detail,
+                    # "detail": self.detail,
                 },
                 {
                     "type": "input_text",
@@ -169,7 +178,7 @@ class OpenAIClient(BaseModelClient):
                         },
                     ]
                 )
-                # self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
+                self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
 
         # Add query instruction
         content.append(
@@ -191,20 +200,20 @@ class OpenAIClient(BaseModelClient):
                     },
                 ]
             )
-            # self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+            self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
 
         # save prompt to file for debugging
         # with open("openai_prompt2.json", "w") as f:
         #     import json
         #     json.dump(content, f, indent=2)
         messages = [{"role": "user", "content": content}]
+
         response = self.client.responses.create(
             model=self.model_id,
             input=messages,
             max_output_tokens=self.max_new_tokens,
             temperature=0.0,
         )
-        breakpoint()
         return response.output_text
 
 
@@ -433,14 +442,77 @@ class KimiThinkingClient(BaseModelClient):
 
         return result
 
+
+class GeminiClient(BaseModelClient):
+    """Gemini client implementation"""
+
+    def __init__(self):
+        if genai is None:
+            raise ImportError("Google GenAI package not installed")
+        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-2.5-flash-lite-preview-06-17"
+
+    def generate_response(
+        self,
+        prompt: str,
+        eval_episode: Episode,
+        context_episodes: List[Episode],
+    ) -> str:
+
+        contents = [prompt]
+
+        # Add initial scene
+        contents.append("Initial robot scene:")
+        contents.append(
+            types.Part.from_bytes(
+                data=self.encode_image(eval_episode.starting_frame),
+                mime_type="image/png",
+            )
+        )
+        contents.append("In the initial robot scene, the task completion percentage is 0.")
+
+        # Add example images with completion percentages
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
+            contents.append(f"Example episode {ctx_episode_idx+1}.")
+            contents.append(f"Instruction: {context_episode.instruction}")
+
+            for i, (task_completion, frame) in enumerate(
+                zip(context_episode.task_completion_predictions, context_episode.frames)
+            ):
+                contents.append(f"Frame {i+1}: ")
+                contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
+                contents.append(f"Task Completion Percentage: {task_completion:.1f}%")
+                self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
+
+
+        # Add query instruction
+        contents.append(
+            f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: ONE SENTENCE DESCRIPTION, Task Completion: PERCENTAGE%"
+        )
+
+        # Add query images
+        for i, frame in enumerate(eval_episode.frames, 1):
+            contents.append(f"Frame {i}: ")
+            contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
+            self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+
+        response = self.client.models.generate_content(model=self.model_name, contents=contents)
+        return response.text
+
+
 class ModelFactory:
     """Factory class to create model clients"""
 
     @staticmethod
     def create_client(model_name: str) -> BaseModelClient:
-        if "gemma" in model_name.lower():
-            return GemmaClient()
-        elif "gpt" in model_name.lower():
+        # if "gemma" in model_name.lower():
+        #     return GemmaClient()
+        if "gpt" in model_name.lower():
             return OpenAIClient()
+        elif "kimi" in model_name.lower():
+            return KimiThinkingClient()
+        elif "gemini" in model_name.lower() or "gemma" in model_name.lower():
+            return GeminiClient()
         else:
             raise ValueError(f"Unknown model: {model_name}")
