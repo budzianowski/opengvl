@@ -22,6 +22,7 @@ class Episode:
     original_frames_indices: list[int]
     shuffled_frames_indices: list[int]
     task_completion_predictions: list[int]
+    unshuffled_task_completion_predictions: list[int]
     frames: list[np.ndarray]
 
 
@@ -40,7 +41,7 @@ class DataLoader:
         camera_index: int = 0,
         seed: int = 42,
         max_episodes: int = 500,
-        num_context_pool: int = 50,
+        num_context_pool: int = 10,
         shuffle: bool = False,
     ):
         """Wrapper around LeRobotDataset to load examples from the dataset.
@@ -70,8 +71,8 @@ class DataLoader:
     def _setup_episodes(self):
         """Splits episodes into fixed eval and context sets."""
         all_indices = [i for i in range(self.max_episodes)]
-        if self.shuffle:
-            self.rng.shuffle(all_indices)
+        # if self.shuffle:
+        #     self.rng.shuffle(all_indices)
 
         if self.max_episodes <= self.num_context_pool:
             raise ValueError("Not enough episodes for context and evaluation split.")
@@ -114,19 +115,20 @@ class DataLoader:
             if not self.shuffle:
                 shuffled_indices = np.arange(len(context_frames_indices))
                 shuffled_frames = [selected_frames[i] for i in shuffled_indices]
-                shuffles_completion_prediction = completion_prediction[shuffled_indices]
+                shuffled_completion_prediction = completion_prediction[shuffled_indices]
             else:
                 shuffled_indices = self.rng.permutation(len(context_frames_indices))
                 shuffled_frames = [selected_frames[i] for i in shuffled_indices]
-                shuffles_completion_prediction = completion_prediction[shuffled_indices]
-
+                shuffled_completion_prediction = completion_prediction[shuffled_indices]
+            breakpoint()
             episode = Episode(
                 starting_frame=frames[0],
                 instruction=dataset[from_idx]["task"],
                 episode_index=episode_index,
                 original_frames_indices=context_frames_indices.tolist(),
                 shuffled_frames_indices=shuffled_indices.tolist(),
-                task_completion_predictions=shuffles_completion_prediction.tolist(),
+                task_completion_predictions=shuffled_completion_prediction.tolist(),
+                unshuffled_task_completion_predictions=completion_prediction.tolist(),
                 frames=shuffled_frames
             )
             episodes.append(episode)
