@@ -40,6 +40,7 @@ class DataLoader:
         camera_index: int = 0,
         seed: int = 42,
         max_episodes: int = 500,
+        num_context_pool: int = 50,
         shuffle: bool = False,
     ):
         """Wrapper around LeRobotDataset to load examples from the dataset.
@@ -62,21 +63,21 @@ class DataLoader:
         self.rng = np.random.default_rng(seed)
         self.max_episodes = min(max_episodes, self.ds_meta.total_episodes)
         self.shuffle = shuffle
+        self.num_context_pool = num_context_pool
 
         self._setup_episodes()
 
     def _setup_episodes(self):
         """Splits episodes into fixed eval and context sets."""
         all_indices = [i for i in range(self.max_episodes)]
-        self.rng.shuffle(all_indices)
+        if self.shuffle:
+            self.rng.shuffle(all_indices)
 
-        # Use a fixed number of episodes for context pool, e.g., 10
-        num_context_pool = 100
-        if self.max_episodes <= num_context_pool:
+        if self.max_episodes <= self.num_context_pool:
             raise ValueError("Not enough episodes for context and evaluation split.")
 
-        self.context_episode_indices_pool = all_indices[:num_context_pool]
-        self.eval_episode_indices = all_indices[num_context_pool:]
+        self.eval_episode_indices = all_indices[:self.num_context_pool]
+        self.context_episode_indices_pool = all_indices[self.num_context_pool:]
         self.next_eval_idx = 0
 
     def _load_episodes_from_indices(self, episode_indices: list[int]) -> list[Episode]:
@@ -125,7 +126,7 @@ class DataLoader:
                 episode_index=episode_index,
                 original_frames_indices=context_frames_indices.tolist(),
                 shuffled_frames_indices=shuffled_indices.tolist(),
-                task_completion_predictions= shuffles_completion_prediction.tolist(),
+                task_completion_predictions=shuffles_completion_prediction.tolist(),
                 frames=shuffled_frames
             )
             episodes.append(episode)
@@ -393,7 +394,19 @@ class DataLoader:
         plt.show()
 
 if __name__ == "__main__":
-    plot_frames(episode_index=50, frame_indices=[121, 115, 76, 289, 290, 74, 282, 142, 296, 104, 93, 269, 236, 160, 50, 222, 149, 3, 197, 127])
-
-
+    dl = DataLoader(
+        dataset_name="lerobot/nyu_door_opening_surprising_effectiveness",
+        num_context_episodes=2,
+        num_frames=10,
+        camera_index=0,
+        seed=42,
+        max_episodes=500,
+        shuffle=False,
+    )
+    example = dl.load_example()
+    dl.plot_single_episode(example=example, episode_idx=0, plot_eval=True)
+    dl.plot_single_episode(example=example, episode_idx=0, plot_eval=False)
+    dl.plot_single_episode(example=example, episode_idx=1, plot_eval=False)
+    # dl.plot_whole_episode(episode_index=example.eval_episode.episode_index)
+    # dl.plot_frames(episode_index=50, frame_indices=[121, 115, 76, 289, 290, 74, 282, 142, 296, 104, 93, 269, 236, 160, 50, 222, 149, 3, 197, 127])
 

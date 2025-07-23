@@ -27,7 +27,7 @@ from transformers import (
 )
 from dotenv import load_dotenv
 from data_loader import Episode
-from vllm import LLM, SamplingParams
+# from vllm import LLM, SamplingParams
 
 # third-party imports
 try:
@@ -40,7 +40,7 @@ load_dotenv()
 class BaseModelClient:
     """Base class for all model clients"""
 
-    max_new_tokens = 1024
+    max_new_tokens = 10240
 
     @abstractmethod
     def generate_response(
@@ -138,8 +138,7 @@ class OpenAIClient(BaseModelClient):
             ]
         )
         # save images to file for debugging (in jpg)
-        # self._to_pil(eval_episode.starting_frame).save("images/initial_scene.jpg", format="JPEG")
-
+        self._to_pil(eval_episode.starting_frame).save("images/initial_scene.jpg", format="JPEG")
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
@@ -199,14 +198,13 @@ class OpenAIClient(BaseModelClient):
         #     import json
         #     json.dump(content, f, indent=2)
         messages = [{"role": "user", "content": content}]
-
         response = self.client.responses.create(
             model=self.model_id,
             input=messages,
             max_output_tokens=self.max_new_tokens,
             temperature=0.0,
         )
-
+        breakpoint()
         return response.output_text
 
 
@@ -308,7 +306,7 @@ class GemmaClient(BaseModelClient):
         logger.info(f"Input length: {input_len}")
 
         with torch.inference_mode():
-            output = self.model.generate(**inputs, max_new_tokens=1024, do_sample=False)
+            output = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens, do_sample=False)
             output = output[0][input_len:]
 
         decoded_outputs = self.processor.decode(output, skip_special_tokens=True)
