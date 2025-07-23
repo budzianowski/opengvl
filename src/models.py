@@ -459,7 +459,6 @@ class GeminiClient(BaseModelClient):
         eval_episode: Episode,
         context_episodes: List[Episode],
     ) -> str:
-
         contents = [prompt]
 
         # Add initial scene
@@ -472,30 +471,28 @@ class GeminiClient(BaseModelClient):
         )
         contents.append("In the initial robot scene, the task completion percentage is 0.")
 
-        # Add example images with completion percentages
-        for ctx_episode_idx, context_episode in enumerate(context_episodes):
-            contents.append(f"Example episode {ctx_episode_idx+1}.")
-            contents.append(f"Instruction: {context_episode.instruction}")
+        contents.append(
+            f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Frame Description: {}, Task Completion Percentages:{}%"
+        )
 
+        counter = 0
+        # Add context images with completion percentages
+        for ctx_episode_idx, context_episode in enumerate(context_episodes):
             for i, (task_completion, frame) in enumerate(
                 zip(context_episode.task_completion_predictions, context_episode.frames)
             ):
-                contents.append(f"Frame {i+1}: ")
+                contents.append(f"Frame {counter}: ")
                 contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
                 contents.append(f"Task Completion Percentage: {task_completion:.1f}%")
                 self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
+                counter += 1
 
-
-        # Add query instruction
-        contents.append(
-            f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: ONE SENTENCE DESCRIPTION, Task Completion: PERCENTAGE%"
-        )
-
-        # Add query images
-        for i, frame in enumerate(eval_episode.frames, 1):
-            contents.append(f"Frame {i}: ")
+        # Add eval images
+        for i, frame in enumerate(eval_episode.frames):
+            contents.append(f"Frame {counter}: ")
             contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
             self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+            counter += 1
 
         response = self.client.models.generate_content(model=self.model_name, contents=contents)
         return response.text

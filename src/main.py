@@ -255,6 +255,7 @@ def run_eval(
             )
             generating_duration = datetime.now() - generating_start
             logger.info(f"Model response received in {generating_duration.total_seconds()} seconds.")
+
             extracted_percentages = result_evaluator.extract_and_validate(response)["prediction"]
             logger.info(f"Extracted percentages: {extracted_percentages}")
             collector.add_result(
