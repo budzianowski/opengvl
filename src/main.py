@@ -1,7 +1,7 @@
 """Example script to produce GVL predictions.
 
 Run:
-    python src/main.py --config-path configs/example.json
+    python src/main.py --config-path configs/gemini.json
 """
 
 import argparse
@@ -13,7 +13,7 @@ from datetime import datetime
 import numpy as np
 import torch
 from loguru import logger
-
+import time
 import utils
 from data_loader import DataLoader
 from models import ModelFactory
@@ -265,7 +265,7 @@ def run_eval(
                 extracted_percentages=extracted_percentages,
                 model_name=model,
             )
-
+            time.sleep(5)
         except Exception as e:
             logger.error(f"Error processing step {step + 1}: {e}")
             error_result = {

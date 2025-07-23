@@ -1,9 +1,12 @@
+""" VOC score calculator """
 import json
 from pathlib import Path
 import numpy as np
+import argparse
 from scipy.stats import spearmanr
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 
 class VOCScorer:
     """
@@ -106,7 +109,7 @@ class VOCScorer:
             "skipped_counts": self.skipped_stats
         }
         return stats
-    #title name of the processed file
+
     def plot_histogram(self, title: str = f"Distribution of VOC Scores", save_path: str | None = None):
         """
         Generates and displays a histogram of the VOC scores.
@@ -146,12 +149,15 @@ class VOCScorer:
 
 
 if __name__ == "__main__":
-    FILE_PATH = Path("/net/pr2/projects/plgrid/plggrobovlm/ew/opengvl/results/gpt4o-2shot-toto_20250721_220815_results_processed.jsonl") # Replace with your actual file path
+    # python src/voc_score.py --file_path /Users/pfb30/working_dir/arm/gvl/results/gvl_eval_20250723_121653_results.jsonl
+    # python src/voc_score.py --file_path results/gvl_eval_20250723_121139_results.jsonl
+    args = argparse.ArgumentParser()
+    args.add_argument("--file_path", type=str, required=True)
+    args = args.parse_args()
 
     scorer = VOCScorer()
-
     try:
-        scorer.process_file(FILE_PATH)
+        scorer.process_file(Path(args.file_path))
 
         statistics = scorer.get_statistics()
         print("--- VOC Score Statistics ---")
@@ -165,7 +171,7 @@ if __name__ == "__main__":
         print("--------------------------\n")
 
 
-        scorer.plot_histogram(save_path="voc_distributiongpt4o.png", title=f"VOC Score Distribution for {FILE_PATH.name}")
+        scorer.plot_histogram(save_path="voc_distribution.png", title=f"VOC Score Distribution for {args.file_path}")
 
     except FileNotFoundError as e:
         print(e)
