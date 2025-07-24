@@ -2,7 +2,6 @@
 
 import json
 import os
-from typing import List, Dict, Union
 from google import genai
 from google.genai import types
 import time
@@ -15,7 +14,7 @@ class ResultEvaluator:
     """
     def __init__(
         self,
-        model_name: str = "gemini-2.5-flash",
+        model_name: str = "gemini-2.5-flash-lite-preview-06-17",
         max_new_tokens: int = 1024,
         temperature: float = 0.5,
         expected_length: int = 20,
@@ -67,7 +66,7 @@ Answer:
 """
         return prompt_template
 
-    def extract_and_validate(self, model_response_text: str) -> Dict[str, Union[List, bool]]:
+    def extract_and_validate(self, model_response_text: str, retries: int = 3) -> dict[str, list | bool]:
         """
         Uses the Google GenAI API to extract percentages and validates the list length.
 
@@ -77,7 +76,7 @@ Answer:
         Returns:
             A dictionary containing the 'prediction' list and a 'length_is_valid' boolean.
         """
-        for attempt in range(3):  # Retry up to 3 times`
+        for attempt in range(retries):
             try:
                 response = self.client.models.generate_content(
                     model=self.model_name,
@@ -88,7 +87,7 @@ Answer:
                     ),
                     contents=model_response_text
                 )
-                
+
                 response_content = response.text
                 json_response = json.loads(response_content)
 
@@ -100,7 +99,7 @@ Answer:
 
             except Exception as e:
                 print(f"Error during API call: {e}")
-                if attempt < 9:
+                if attempt < retries - 1:
                     print("Retrying...")
                     time.sleep(4)
                 else:

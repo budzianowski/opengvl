@@ -31,7 +31,7 @@ CONFIG = {
     "model": "gemma-3-27b-it",
     "num_context_episodes": 2,
     "max_frames": 20,
-    "num_eval_steps": 3,
+    "num_eval_steps": 50,
     "shuffle": False,
     "camera_index": 0,
     "output_dir": "results",

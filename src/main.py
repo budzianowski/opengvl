@@ -7,11 +7,9 @@ Run:
 import argparse
 import json
 import os
-import random
 from datetime import datetime
 
 import numpy as np
-import torch
 from loguru import logger
 import time
 import utils
@@ -51,10 +49,9 @@ class ResultCollector:
         os.makedirs(output_dir, exist_ok=True)
 
         if experiment_name is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.experiment_name = f"gvl_eval_{timestamp}"
+            self.experiment_name = f"{model}_{name}"
         else:
-            self.experiment_name = experiment_name + f'_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
+            self.experiment_name = experiment_name
 
         logger.info(f"Saving results to {output_dir}/{self.experiment_name}_results.jsonl")
         self.results_file = os.path.join(output_dir, f"{self.experiment_name}_results.jsonl")
@@ -220,6 +217,10 @@ def run_eval(
         camera_index=camera_index,
     )
 
+    if not resume and os.path.exists(collector.results_file):
+        logger.error(f"Results file already exists: {collector.results_file}")
+        return
+
     start_step = 0
     if resume:
         logger.info("Resuming from existing results...")
@@ -227,7 +228,12 @@ def run_eval(
         if start_step >= num_eval_steps:
             return collector.results_file
 
-    result_evaluator = ResultEvaluator()
+    result_evaluator = ResultEvaluator(
+        # model_name="gemini-2.5-flash-lite-preview-06-17",
+        # max_new_tokens=1024,
+        # # temperature=0.0,
+        # expected_length=max_frames,
+    )
     loader = DataLoader(
         dataset_name=name,
         num_context_episodes=num_context_episodes,

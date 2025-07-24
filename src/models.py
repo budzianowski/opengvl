@@ -450,7 +450,7 @@ class GeminiClient(BaseModelClient):
         if genai is None:
             raise ImportError("Google GenAI package not installed")
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model_name = "gemini-2.5-flash"
+        # self.model_name = "gemini-2.5-flash"
         self.model_name = "gemini-2.5-flash-lite-preview-06-17"
 
     def generate_response(
