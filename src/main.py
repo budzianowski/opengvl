@@ -59,7 +59,6 @@ class ResultCollector:
         logger.info(f"Saving results to {output_dir}/{self.experiment_name}_results.jsonl")
         self.results_file = os.path.join(output_dir, f"{self.experiment_name}_results.jsonl")
         self.summary_file = os.path.join(output_dir, f"{self.experiment_name}_summary.json")
-
         self.results = []
         self.experiment_config = {}
 
@@ -92,6 +91,7 @@ class ResultCollector:
                 "original_frames_indices": example.eval_episode.original_frames_indices,
                 "shuffled_frames_indices": example.eval_episode.shuffled_frames_indices,
                 "ground_truth_completion": example.eval_episode.task_completion_predictions,
+                "unshuffled_task_completion_predictions": example.eval_episode.unshuffled_task_completion_predictions,
             },
             "context_episodes": [
                 {
@@ -100,6 +100,7 @@ class ResultCollector:
                     "original_frames_indices": ctx_ep.original_frames_indices,
                     "shuffled_frames_indices": ctx_ep.shuffled_frames_indices,
                     "ground_truth_completion": ctx_ep.task_completion_predictions,
+                    "unshuffled_task_completion_predictions": ctx_ep.unshuffled_task_completion_predictions,
                 }
                 for ctx_ep in example.context_episodes
             ],
@@ -267,6 +268,7 @@ def run_eval(
                 model_name=model,
             )
             time.sleep(5)
+
         except Exception as e:
             logger.error(f"Error processing step {step + 1}: {e}")
             error_result = {

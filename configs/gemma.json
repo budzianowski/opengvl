@@ -3,8 +3,8 @@
     "model": "gemma-3-27b-it",
     "shuffle": false,
     "num_context_episodes": 1,
-    "max_frames": 20,
-    "num_eval_steps": 1,
+    "max_frames": 30,
+    "num_eval_steps": 20,
     "camera_index": 0,
     "output_dir": "results",
     "experiment_name": null,
@@ -13,4 +13,4 @@
     "results_file": null,
     "output_file": null,
     "batch_size": 8
-}
+  } 

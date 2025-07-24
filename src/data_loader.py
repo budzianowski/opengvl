@@ -40,8 +40,8 @@ class DataLoader:
         num_frames: int = 10,
         camera_index: int = 0,
         seed: int = 42,
-        max_episodes: int = 500,
-        num_context_pool: int = 10,
+        max_episodes: int = 100,
+        num_eval_pool: int = 50,
         shuffle: bool = False,
     ):
         """Wrapper around LeRobotDataset to load examples from the dataset.
@@ -64,7 +64,7 @@ class DataLoader:
         self.rng = np.random.default_rng(seed)
         self.max_episodes = min(max_episodes, self.ds_meta.total_episodes)
         self.shuffle = shuffle
-        self.num_context_pool = num_context_pool
+        self.num_eval_pool = num_eval_pool
 
         self._setup_episodes()
 
@@ -74,11 +74,11 @@ class DataLoader:
         # if self.shuffle:
         #     self.rng.shuffle(all_indices)
 
-        if self.max_episodes <= self.num_context_pool:
+        if self.max_episodes <= self.num_eval_pool:
             raise ValueError("Not enough episodes for context and evaluation split.")
 
-        self.eval_episode_indices = all_indices[:self.num_context_pool]
-        self.context_episode_indices_pool = all_indices[self.num_context_pool:]
+        self.eval_episode_indices = all_indices[:self.num_eval_pool]
+        self.context_episode_indices_pool = all_indices[self.num_eval_pool:]
         self.next_eval_idx = 0
 
     def _load_episodes_from_indices(self, episode_indices: list[int]) -> list[Episode]:
@@ -120,7 +120,7 @@ class DataLoader:
                 shuffled_indices = self.rng.permutation(len(context_frames_indices))
                 shuffled_frames = [selected_frames[i] for i in shuffled_indices]
                 shuffled_completion_prediction = completion_prediction[shuffled_indices]
-            breakpoint()
+ 
             episode = Episode(
                 starting_frame=frames[0],
                 instruction=dataset[from_idx]["task"],

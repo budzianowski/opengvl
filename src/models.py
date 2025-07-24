@@ -147,7 +147,7 @@ class OpenAIClient(BaseModelClient):
             ]
         )
         # save images to file for debugging (in jpg)
-        self._to_pil(eval_episode.starting_frame).save("images/initial_scene.jpg", format="JPEG")
+        # self._to_pil(eval_episode.starting_frame).save("images/initial_scene.jpg", format="JPEG")
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
@@ -178,7 +178,7 @@ class OpenAIClient(BaseModelClient):
                         },
                     ]
                 )
-                self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
+                # self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
 
         # Add query instruction
         content.append(
@@ -200,7 +200,7 @@ class OpenAIClient(BaseModelClient):
                     },
                 ]
             )
-            self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+            # self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
 
         # save prompt to file for debugging
         # with open("openai_prompt2.json", "w") as f:
@@ -471,11 +471,8 @@ class GeminiClient(BaseModelClient):
         )
         contents.append("\nIn the initial robot scene, the task completion percentage is 0. \n")
 
-        contents.append(
-            f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Frame Description: {}, Task Completion Percentages:{}% \n"
-        )
-
         counter = 1
+
         # Add context images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
             for i, (task_completion, frame) in enumerate(
@@ -484,14 +481,26 @@ class GeminiClient(BaseModelClient):
                 contents.append(f"Frame {counter}: ")
                 contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
                 contents.append(f"Task Completion Percentage: {task_completion:.1f}% \n")
-                self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
+                # self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}__frame_{i+1}_taskcompletion_{task_completion:.1f}.jpg", format="JPEG")
                 counter += 1
 
+        # contents.append(
+        #     f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Frame Description: {}, Task Completion Percentages:{}% \n"
+        # )
+        contents.append(
+            f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n"
+        )
+        contents.append(
+            f"Be rigorous, precise and remember that the task completion percentage is the percentage of the task that has been completed. \n"
+        )
+        contents.append(
+            f"Remember that the frames are presented in random order. \n"
+        )
         # Add eval images
         for i, frame in enumerate(eval_episode.frames):
             contents.append(f"Frame {counter}: ")
             contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
-            self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+            # self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
             contents.append(f"\n")
             counter += 1
 

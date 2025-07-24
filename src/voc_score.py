@@ -63,18 +63,17 @@ class VOCScorer:
 
                 print(preds)
 
-                # --- Validation ---
                 if not preds:
                     self.skipped_stats["empty_preds"] += 1
                     continue
                 if not shuffled_indices:
                     self.skipped_stats["no_indices"] += 1
                     continue
+
                 if len(shuffled_indices) != len(preds):
                     self.skipped_stats["mismatch_length"] += 1
                     continue
 
-                # --- Unshuffle predictions to chronological order ---
                 try:
                     sorted_indices = np.argsort(shuffled_indices)
                     chrono_preds = np.array(preds)[sorted_indices].tolist()
