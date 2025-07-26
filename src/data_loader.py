@@ -109,7 +109,7 @@ class DataLoader:
                 else np.array([100] * len(context_frames_indices))
             )
             selected_frames = [frames[i] for i in context_frames_indices]
-            breakpoint()
+
             if not self.shuffle:
                 shuffled_indices = np.arange(len(context_frames_indices))
                 shuffled_frames = [selected_frames[i] for i in shuffled_indices]

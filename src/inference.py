@@ -491,13 +491,13 @@ def main():
                        help="Model name (default: gemini-2.5-pro)")
     parser.add_argument("--num-context-episodes", type=int, default=2,
                        help="Number of context episodes for dataset loading (default: 2)")
-    parser.add_argument("--max-frames", type=int, default=10,
+    parser.add_argument("--max-frames", type=int, default=30,
                        help="Maximum number of frames to process (default: 10)")
     
     # Other arguments
     parser.add_argument("--camera-index", type=int, default=0,
                        help="Camera index for dataset loading (default: 0)")
-    parser.add_argument("--shuffle", action="store_true",
+    parser.add_argument("--shuffle", action="store_true", default=True,
                        help="Shuffle images (for image inputs)")
     parser.add_argument("--seed", type=int, default=42,
                        help="Random seed (default: 42)")
