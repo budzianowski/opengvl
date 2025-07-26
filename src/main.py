@@ -228,12 +228,7 @@ def run_eval(
         if start_step >= num_eval_steps:
             return collector.results_file
 
-    result_evaluator = ResultEvaluator(
-        # model_name="gemini-2.5-flash-lite-preview-06-17",
-        # max_new_tokens=1024,
-        # # temperature=0.0,
-        # expected_length=max_frames,
-    )
+    result_evaluator = ResultEvaluator()
     loader = DataLoader(
         dataset_name=name,
         num_context_episodes=num_context_episodes,

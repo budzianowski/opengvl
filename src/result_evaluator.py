@@ -89,12 +89,16 @@ Answer:
                 )
 
                 response_content = response.text
+                if "```json\n" in response_content:
+                    response_content = response_content.split("```json\n")[1]
+                if "\n```" in response_content:
+                    response_content = response_content.split("\n```")[0]
+
                 json_response = json.loads(response_content)
 
                 prediction = json_response.get("prediction", [])
                 
                 is_valid_length = len(prediction) == self.expected_length
-                
                 return {"prediction": prediction, "length_is_valid": is_valid_length}
 
             except Exception as e:

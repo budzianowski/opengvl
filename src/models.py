@@ -446,12 +446,11 @@ class KimiThinkingClient(BaseModelClient):
 class GeminiClient(BaseModelClient):
     """Gemini client implementation"""
 
-    def __init__(self):
+    def __init__(self, model_name: str = "gemini-2.5-flash-lite-preview-06-17"):
         if genai is None:
             raise ImportError("Google GenAI package not installed")
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-        # self.model_name = "gemini-2.5-flash"
-        self.model_name = "gemini-2.5-flash-lite-preview-06-17"
+        self.model_name = model_name
 
     def generate_response(
         self,
@@ -520,6 +519,6 @@ class ModelFactory:
         elif "kimi" in model_name.lower():
             return KimiThinkingClient()
         elif "gemini" in model_name.lower() or "gemma" in model_name.lower():
-            return GeminiClient()
+            return GeminiClient(model_name=model_name)
         else:
             raise ValueError(f"Unknown model: {model_name}")
