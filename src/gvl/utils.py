@@ -1,21 +1,22 @@
-"""Example script to produce GVL predictions.
-
-Run:
-    python src/main.py --config-path configs/gemini.json
-"""
-
-import argparse
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from loguru import logger
-import time
-import utils
-from data_loader import DataLoader
-from models import ModelFactory
-from result_evaluator import ResultEvaluator
+from PIL import Image
+
+from .data_loader import DataLoader, Episode, Example
+from .models import ModelFactory
+from .result_evaluator import ResultEvaluator
+from .voc_score import VOCScorer
+
+
+def get_prompt(instruction: str) -> str:
+    """Creates a prompt for the model."""
+    return f"Your task is to predict the percentage of completion for a given task: '{instruction}'."
 
 
 def convert_numpy_types(obj):
@@ -54,8 +55,8 @@ class ResultCollector:
             self.experiment_name = experiment_name
 
         logger.info(f"Saving results to {output_dir}/{self.experiment_name}_results.jsonl")
-        self.results_file = os.path.join(output_dir, f"{self.experiment_name}_results.jsonl")
-        self.summary_file = os.path.join(output_dir, f"{self.experiment_name}_summary.json")
+        self.results_file = Path(output_dir) / f"{self.experiment_name}_results.jsonl"
+        self.summary_file = Path(output_dir) / f"{self.experiment_name}_summary.json"
         self.results = []
         self.experiment_config = {}
 
@@ -136,7 +137,7 @@ class ResultCollector:
         summary = {
             "experiment_name": self.experiment_name,
             "config": self.experiment_config,
-            "results_file": self.results_file,
+            "results_file": str(self.results_file),
             "total_steps": len(self.results),
             "created_at": datetime.now().isoformat(),
         }
@@ -162,164 +163,10 @@ class ResultCollector:
     def load_existing_results(self):
         """Load existing results from JSONL file if it exists"""
         logger.info(f"Loading existing results from {self.results_file}...")
-        if os.path.exists(self.results_file):
+        if self.results_file.exists():
             with open(self.results_file, "r") as f:
                 for line in f:
                     if line.strip():
                         self.results.append(json.loads(line))
             logger.info(f"Loaded {len(self.results)} existing results from {self.results_file}")
         return len(self.results)
-
-
-def batch_evaluate_results(results_file: str, output_file: str = None, batch_size: int = 8):
-    """
-    Run batch evaluation on an existing results file.
-
-    Args:
-        results_file: Path to the JSONL results file
-        output_file: Path to save updated results (if None, overwrites input file)
-        batch_size: Batch size for model inference
-    """
-    if not os.path.exists(results_file):
-        raise FileNotFoundError(f"Results file not found: {results_file}")
-
-    logger.info(f"Starting batch evaluation of {results_file} with batch size {batch_size}")
-
-    # result_evaluator = ResultEvaluator(batch_size=batch_size)
-    # updated_file = result_evaluator.batch_evaluate_jsonl(results_file, output_file)
-
-    logger.info(f"Batch evaluation completed. Updated file: {updated_file}")
-    return updated_file
-
-
-def run_eval(
-    name: str,
-    model: str = "google/gemma-3-4b-it",
-    num_context_episodes: int = 2,
-    max_frames: int = 10,
-    num_eval_steps: int = 5,
-    camera_index: int = 0,
-    output_dir: str = "results",
-    experiment_name: str = None,
-    resume: bool = False,
-    shuffle: bool = False,
-):
-    """Main function to run the data loading and prompt generation."""
-
-    collector = ResultCollector(
-        output_dir=output_dir,
-        experiment_name=experiment_name,
-        name=name,
-        model=model,
-        num_context_episodes=num_context_episodes,
-        max_frames=max_frames,
-        num_eval_steps=num_eval_steps,
-        camera_index=camera_index,
-    )
-
-    if not resume and os.path.exists(collector.results_file):
-        logger.error(f"Results file already exists: {collector.results_file}")
-        return
-
-    start_step = 0
-    if resume:
-        logger.info("Resuming from existing results...")
-        start_step = collector.load_existing_results()
-        if start_step >= num_eval_steps:
-            return collector.results_file
-
-    result_evaluator = ResultEvaluator()
-    loader = DataLoader(
-        dataset_name=name,
-        num_context_episodes=num_context_episodes,
-        num_frames=max_frames,
-        camera_index=camera_index,
-        shuffle=shuffle,
-    )
-
-    logger.info(f"Loading examples for {num_eval_steps} evaluation steps...")
-    examples = loader.load_examples(num_eval_steps)
-
-    logger.info("Creating model client...")
-    client = ModelFactory.create_client(model)
-
-    for step, example in enumerate(examples):
-        logger.info(f"Processing step {step + 1}/{num_eval_steps}...")
-        try:
-
-            prompt = utils.get_prompt(example.eval_episode.instruction)
-            logger.info(f"Waiting for model response ...")
-            generating_start = datetime.now()
-            response = client.generate_response(
-                prompt=prompt,
-                eval_episode=example.eval_episode,
-                context_episodes=example.context_episodes,
-            )
-            generating_duration = datetime.now() - generating_start
-            logger.info(f"Model response received in {generating_duration.total_seconds()} seconds.")
-
-            extracted_percentages = result_evaluator.extract_and_validate(response)["prediction"]
-            logger.info(f"Extracted percentages: {extracted_percentages}")
-            collector.add_result(
-                step=step + 1,
-                example=example,
-                model_response=response,
-                voc_score=None,
-                extracted_percentages=extracted_percentages,
-                model_name=model,
-            )
-            time.sleep(5)
-
-        except Exception as e:
-            logger.error(f"Error processing step {step + 1}: {e}")
-            error_result = {
-                "step": step + 1,
-                "timestamp": datetime.now().isoformat(),
-                "model": model,
-                "error": str(e),
-                "status": "failed",
-            }
-            with open(collector.results_file, "a") as f:
-                f.write(json.dumps(error_result) + "\n")
-            continue
-
-    return collector.results_file
-
-
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path", type=str, help="Path to the config file")
-    args = parser.parse_args()
-    # print current path
-    logger.info(f"Current working directory: {os.getcwd()}")
-
-    try:
-        with open(args.config_path, "r") as f:
-            config = json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load config file {args.config_path}: {e}")
-        exit(1)
-    logger.info(
-        f"Running evaluation on model: {config['model']} on dataset: {config['dataset']} with {config['num_context_episodes']} context episodes and {config['max_frames']} max frames on {config['num_eval_steps']} steps."
-    )
-
-    if config.get("batch_eval"):
-        logger.info(f"Batch evaluation mode enabled. Using results file: {config['results_file']}")
-        if not config.get("results_file"):
-            parser.error("--results_file is required when using --batch_eval")
-        batch_evaluate_results(config["results_file"], config["output_file"], config["batch_size"])
-    else:
-        logger.info("Running regular evaluation...")
-        run_eval(
-            config["dataset"],
-            config["model"],
-            config["num_context_episodes"],
-            config["max_frames"],
-            config["num_eval_steps"],
-            config["camera_index"],
-            config["output_dir"],
-            config.get("experiment_name"),
-            config.get("resume", False),
-            config.get("shuffle", False),
-        )

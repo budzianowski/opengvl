@@ -10,27 +10,23 @@ license = { file = "LICENSE" }
 requires-python = ">=3.11"
 dependencies = [
     "accelerate>=1.8.1",
-    "isort>=6.0.1",
-    "marimo>=0.14.10",
-    "openai>=1.93.0",
-    "pytest>=8.4.1",
-    "ruff>=0.12.2",
-    "scipy>=1.16.0",
-    "tensorflow>=2.19.0",
-    "tensorflow-datasets>=4.9.9",
-    "tfds>=0.3",
-    "torch>=2.7.1",
-    "torchvision>=0.22.1",
-    "transformers>=4.53.0",
+    "tyro>=0.8.4",
+    "loguru>=0.7.2",
+    "matplotlib>=3.9.1",
+    "numpy>=1.22,<1.27",
+    "scipy>=1.14.0",
+    "torch>=2.2.0",
+    "torchvision>=0.17.1,<0.18.0",
+    "lerobot==0.1.0",
+    "datasets>=2.20.0",
+    "openai>=1.35.13",
+    "google-genai>=0.7.2",
+    "transformers>=4.42.4",
+    "pillow>=10.4.0",
+    "python-dotenv>=1.0.1",
 ]
 
 [project.optional-dependencies]
-closed = [
-    "openai>=1.93.0",
-    "google-genai>=1.22.0",
-]
-
-[dependency-groups]
 dev = [
     "black>=24.10.0",
     "pytest>=8.4.1",
@@ -85,3 +81,9 @@ required-imports = ["from __future__ import annotations"]
 
 [tool.black]
 line-length = 120
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+gvl = "gvl.main:main"

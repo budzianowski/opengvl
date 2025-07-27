@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from voc_score import value_order_correlation
+from gvl.voc_score import value_order_correlation
 
 
 class TestValueOrderCorrelation:
