@@ -69,12 +69,10 @@ class BaseModelClient:
             if image.is_cuda:
                 image = image.cpu()
 
-            print(f"Converting image of type {type(image)} to PIL Image...")
             image = image.detach().numpy()
 
         # Handle different numpy array formats
         if isinstance(image, np.ndarray):
-            print(f"Image shape: {image.shape}, dtype: {image.dtype}")
             # Normalize if values are in [0, 1] range
             if image.dtype == np.float32 or image.dtype == np.float64:
                 if image.max() <= 1.0:
@@ -328,23 +326,14 @@ class KimiThinkingClient(BaseModelClient):
     def __init__(self, model_id: str = "moonshotai/Kimi-VL-A3B-Thinking-2506"):
 
         logger.info(f"Loading Kimi Thinking model {model_id}...")
-        self.model = LLM(
+        self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
+            torch_dtype="auto",
+            device_map="auto",
             trust_remote_code=True,
-            max_num_seqs=8,
-            max_model_len=131072,
-            limit_mm_per_prompt={"image": 256}
         )
 
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-        self.sampling_params = SamplingParams(max_tokens=32768, temperature=0.8)
-
-    def extract_thinking_and_summary(self, text: str, bot: str = "◁think▷", eot: str = "◁/think▷") -> str:
-        if bot in text and eot not in text:
-            return ""
-        if eot in text:
-            return text[text.index(bot) + len(bot):text.index(eot)].strip(), text[text.index(eot) + len(eot) :].strip()
-        return "", text
 
     def generate_response(
         self,
@@ -353,17 +342,14 @@ class KimiThinkingClient(BaseModelClient):
         context_episodes: List[Episode],
         ) -> str:
 
-        # Build messages for Gemma following GPT4o structure exactly
+        images = []
         messages = [
             {
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
                     {"type": "text", "text": "Initial robot scene:"},
-                    {
-                        "type": "image",
-                        "image": self._to_pil(eval_episode.starting_frame),
-                    },
+                    {"type": "image"},
                     {
                         "type": "text",
                         "text": "In the initial robot scene, the task completion percentage is 0.",
@@ -371,6 +357,7 @@ class KimiThinkingClient(BaseModelClient):
                 ],
             }
         ]
+        images.append(self._to_pil(eval_episode.starting_frame))
 
         # Add example images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
@@ -384,19 +371,22 @@ class KimiThinkingClient(BaseModelClient):
                 ]
             )
 
+            logger.info(f'Context image type: {type(self._to_pil(context_episode.starting_frame))}')
+
             for i, (task_completion, frame) in enumerate(
                 zip(context_episode.task_completion_predictions, context_episode.frames)
             ):
                 messages[0]["content"].extend(
                     [
                         {"type": "text", "text": f"Frame {i+1}: "},
-                        {"type": "image", "base64": self._to_pil(frame)},
+                        {"type": "image"},
                         {
                             "type": "text",
                             "text": f"Task Completion Percentage: {task_completion:.1f}%",
                         },
                     ]
                 )
+                images.append(self._to_pil(frame))
 
         # Add query instruction
         messages[0]["content"].append(
@@ -411,36 +401,32 @@ class KimiThinkingClient(BaseModelClient):
             messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Frame {i}: "},
-                    {"type": "image", "base64": self._to_pil(frame)},
+                    {"type": "image"},
                 ]
             )
+            images.append(self._to_pil(frame))
 
-
-        inputs = self.processor.apply_chat_template(
+        prompt = self.processor.apply_chat_template(
             messages,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
+            add_generation_prompt=True
         )
-
+        inputs = self.processor(text=prompt, images=images, return_tensors="pt").to(self.model.device, dtype=torch.bfloat16)
+        
         input_len = inputs["input_ids"].shape[-1]
 
         if input_len > 128_000:
             raise ValueError(f"Input length {input_len} exceeds maximum allowed length of 128000 tokens.")
         logger.info(f"Input length: {input_len}")
 
-        # TODO: Fix input to model below
-        outputs = self.model.generate([{"prompt": text, "multi_modal_data": {"image": image}}], sampling_params=self.sampling_params)
-        generated_text = outputs[0].outputs[0].text
+        generated_ids = self.model.generate(**inputs, max_new_tokens=32768, temperature=0.8)
+        generated_ids_trimmed = [
+            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+        ]
+        response = self.processor.batch_decode(
+            generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )[0]
 
-
-        OUTPUT_FORMAT = "--------Thinking--------\n{thinking}\n\n--------Summary--------\n{summary}"
-
-        thinking, summary = self.extract_thinking_and_summary(generated_text)
-        result = OUTPUT_FORMAT.format(thinking=thinking, summary=summary)
-
-        return result
+        return response
 
 
 class GeminiClient(BaseModelClient):
