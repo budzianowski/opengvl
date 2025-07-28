@@ -77,7 +77,6 @@ select = [
 "tests/*" = ["S101", "S603"]
 
 [tool.ruff.lint.isort]
-required-imports = ["from __future__ import annotations"]
 
 [tool.black]
 line-length = 120
