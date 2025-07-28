@@ -27,7 +27,7 @@ from transformers import (
 )
 from dotenv import load_dotenv
 from data_loader import Episode
-# from vllm import LLM, SamplingParams
+
 
 # third-party imports
 try:
@@ -138,35 +138,25 @@ class OpenAIClient(BaseModelClient):
                 {
                     "type": "input_image",
                     "image_url": f"data:image/png;base64,{self.encode_image(eval_episode.starting_frame)}",
-                    # "detail": self.detail,
+                    "detail": self.detail,
                 },
                 {
                     "type": "input_text",
-                    "text": "In the initial robot scene, the task completion percentage is 0.",
+                    "text": "\nIn the initial robot scene, the task completion percentage is 0. \n",
                 },
             ]
         )
-        # save images to file for debugging (in jpg)
-        # self._to_pil(eval_episode.starting_frame).save("images/initial_scene.jpg", format="JPEG")
 
-        # Add example images with completion percentages
+        counter = 1
+
+        # Add context images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
-            content.extend(
-                [
-                    {"type": "input_text", "text": f"Example episode {ctx_episode_idx+1}."},
-                    {
-                        "type": "input_text",
-                        "text": f"Instruction: {context_episode.instruction}",
-                    },
-                ]
-            )
-
             for i, (task_completion, frame) in enumerate(
                 zip(context_episode.task_completion_predictions, context_episode.frames)
             ):
                 content.extend(
                     [
-                        {"type": "input_text", "text": f"Frame {i+1}: "},
+                        {"type": "input_text", "text": f"Frame {counter}: "},
                         {
                             "type": "input_image",
                             "image_url": f"data:image/png;base64,{self.encode_image(frame)}",
@@ -174,45 +164,53 @@ class OpenAIClient(BaseModelClient):
                         },
                         {
                             "type": "input_text",
-                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
+                            "text": f"Task Completion Percentage: {task_completion:.1f}% \n",
                         },
                     ]
                 )
-                # self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}_taskcompletion_{task_completion:.1f}_frame_{i+1}.jpg", format="JPEG")
+                counter += 1
 
         # Add query instruction
         content.append(
             {
                 "type": "input_text",
-                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%",
+                "text": f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n",
+            }
+        )
+        content.append(
+            {
+                "type": "input_text",
+                "text": f"Be rigorous, precise and remember that the task completion percentage is the percentage of the task that has been completed. \n",
+            }
+        )
+        content.append(
+            {
+                "type": "input_text",
+                "text": f"Remember that the frames are presented in random order. \n",
             }
         )
 
-        # Add query images
-        for i, frame in enumerate(eval_episode.frames, 1):
+        # Add eval images
+        for i, frame in enumerate(eval_episode.frames):
             content.extend(
                 [
-                    {"type": "input_text", "text": f"Frame {i}: "},
+                    {"type": "input_text", "text": f"Frame {counter}: "},
                     {
                         "type": "input_image",
                         "image_url": f"data:image/png;base64,{self.encode_image(frame)}",
                         "detail": self.detail,
                     },
+                    {"type": "input_text", "text": f"\n"},
                 ]
             )
-            # self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+            counter += 1
 
-        # save prompt to file for debugging
-        # with open("openai_prompt2.json", "w") as f:
-        #     import json
-        #     json.dump(content, f, indent=2)
         messages = [{"role": "user", "content": content}]
 
         response = self.client.responses.create(
             model=self.model_id,
             input=messages,
             max_output_tokens=self.max_new_tokens,
-            # temperature=0.0,
         )
         return response.output_text
 
@@ -292,13 +290,10 @@ class GemmaClient(BaseModelClient):
                 [
                     {"type": "text", "text": f"Frame {i}: "},
                     {"type": "image", "base64": self._to_pil(frame)},
+
+
                 ]
             )
-
-    # debugging, save messages to file
-        with open("gemma_messages.json", "w") as f:
-            import json
-            json.dump(messages, f, indent=2)
 
         inputs = self.processor.apply_chat_template(
             messages,
@@ -326,22 +321,18 @@ class KimiThinkingClient(BaseModelClient):
     """Kimi Thinking client implementation"""
 
     def __init__(self, model_id: str = "moonshotai/Kimi-VL-A3B-Thinking-2506"):
-
         logger.info(f"Loading Kimi Thinking model {model_id}...")
-        self.model = LLM(
+        self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
+            torch_dtype="auto",
+            device_map="auto",
             trust_remote_code=True,
-            max_num_seqs=8,
-            max_model_len=131072,
-            limit_mm_per_prompt={"image": 256}
         )
-
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-        self.sampling_params = SamplingParams(max_tokens=32768, temperature=0.8)
 
-    def extract_thinking_and_summary(self, text: str, bot: str = "◁think▷", eot: str = "◁/think▷") -> str:
+    def extract_thinking_and_summary(self, text: str, bot: str = "◁think▷", eot: str = "◁/think▷") -> tuple:
         if bot in text and eot not in text:
-            return ""
+            return "", ""
         if eot in text:
             return text[text.index(bot) + len(bot):text.index(eot)].strip(), text[text.index(eot) + len(eot) :].strip()
         return "", text
@@ -353,91 +344,96 @@ class KimiThinkingClient(BaseModelClient):
         context_episodes: List[Episode],
         ) -> str:
 
-        # Build messages for Gemma following GPT4o structure exactly
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "text", "text": "Initial robot scene:"},
-                    {
-                        "type": "image",
-                        "image": self._to_pil(eval_episode.starting_frame),
-                    },
-                    {
-                        "type": "text",
-                        "text": "In the initial robot scene, the task completion percentage is 0.",
-                    },
-                ],
-            }
-        ]
+        # Collect all images and build content following Gemini client structure
+        images = []
+        content = []
+        
+        # Add initial prompt
+        content.append({"type": "text", "text": prompt})
 
-        # Add example images with completion percentages
+        # Add initial scene
+        content.append({"type": "text", "text": "Initial robot scene:"})
+        initial_image = self._to_pil(eval_episode.starting_frame)
+        images.append(initial_image)
+        content.append({"type": "image", "image": len(images) - 1})
+        content.append({"type": "text", "text": "\nIn the initial robot scene, the task completion percentage is 0. \n"})
+
+        counter = 1
+
+        # Add context images with completion percentages
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
-            messages[0]["content"].extend(
-                [
-                    {"type": "text", "text": f"Example episode {ctx_episode_idx+1}."},
-                    {
-                        "type": "text",
-                        "text": f"Instruction: {context_episode.instruction}",
-                    },
-                ]
-            )
-
             for i, (task_completion, frame) in enumerate(
                 zip(context_episode.task_completion_predictions, context_episode.frames)
             ):
-                messages[0]["content"].extend(
-                    [
-                        {"type": "text", "text": f"Frame {i+1}: "},
-                        {"type": "image", "base64": self._to_pil(frame)},
-                        {
-                            "type": "text",
-                            "text": f"Task Completion Percentage: {task_completion:.1f}%",
-                        },
-                    ]
-                )
+                content.append({"type": "text", "text": f"Frame {counter}: "})
+                frame_image = self._to_pil(frame)
+                images.append(frame_image)
+                content.append({"type": "image", "image": len(images) - 1})
+                content.append({"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}% \n"})
+                counter += 1
 
-        # Add query instruction
-        messages[0]["content"].append(
-            {
-                "type": "text",
-                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Description: DESCRIPTION, Task Completion: PERCENTAGE%\n",
-            }
-        )
+        content.append({
+            "type": "text",
+            "text": f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n"
+        })
+        content.append({
+            "type": "text",
+            "text": f"Be rigorous, precise and remember that the task completion percentage is the percentage of the task that has been completed. \n"
+        })
+        content.append({
+            "type": "text",
+            "text": f"Remember that the frames are presented in random order. \n"
+        })
+        
+        # Add eval images
+        for i, frame in enumerate(eval_episode.frames):
+            content.append({"type": "text", "text": f"Frame {counter}: "})
+            query_image = self._to_pil(frame)
+            images.append(query_image)
+            content.append({"type": "image", "image": len(images) - 1})
+            content.append({"type": "text", "text": f"\n"})
+            counter += 1
 
-        # Add query images
-        for i, frame in enumerate(eval_episode.frames, 1):
-            messages[0]["content"].extend(
-                [
-                    {"type": "text", "text": f"Frame {i}: "},
-                    {"type": "image", "base64": self._to_pil(frame)},
-                ]
-            )
+        messages = [{"role": "user", "content": content}]
 
-
-        inputs = self.processor.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            tokenize=True,
-            return_dict=True,
-            return_tensors="pt",
-        )
+        # Apply chat template to get text
+        text = self.processor.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
+        
+        # Process inputs with images
+        inputs = self.processor(
+            images=images, 
+            text=text, 
+            return_tensors="pt", 
+            padding=True, 
+            truncation=True
+        ).to(self.model.device)
 
         input_len = inputs["input_ids"].shape[-1]
-
         if input_len > 128_000:
             raise ValueError(f"Input length {input_len} exceeds maximum allowed length of 128000 tokens.")
         logger.info(f"Input length: {input_len}")
 
-        # TODO: Fix input to model below
-        outputs = self.model.generate([{"prompt": text, "multi_modal_data": {"image": image}}], sampling_params=self.sampling_params)
-        generated_text = outputs[0].outputs[0].text
-
+        # Generate response
+        generated_ids = self.model.generate(
+            **inputs, 
+            max_new_tokens=32768, 
+            temperature=0.8
+        )
+        
+        # Trim generated ids to only new tokens
+        generated_ids_trimmed = [
+            out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+        ]
+        
+        # Decode response
+        response = self.processor.batch_decode(
+            generated_ids_trimmed, 
+            skip_special_tokens=True, 
+            clean_up_tokenization_spaces=False
+        )[0]
 
         OUTPUT_FORMAT = "--------Thinking--------\n{thinking}\n\n--------Summary--------\n{summary}"
-
-        thinking, summary = self.extract_thinking_and_summary(generated_text)
+        thinking, summary = self.extract_thinking_and_summary(response)
         result = OUTPUT_FORMAT.format(thinking=thinking, summary=summary)
 
         return result
@@ -480,7 +476,7 @@ class GeminiClient(BaseModelClient):
                 contents.append(f"Frame {counter}: ")
                 contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
                 contents.append(f"Task Completion Percentage: {task_completion:.1f}% \n")
-                # self._to_pil(frame).save(f"images/example_{ctx_episode_idx+1}__frame_{i+1}_taskcompletion_{task_completion:.1f}.jpg", format="JPEG")
+                # self._to_pil(frame).save(f"images2/example_{ctx_episode_idx+1}__frame_{i+1}_taskcompletion_{task_completion:.1f}.jpg", format="JPEG")
                 counter += 1
 
         # contents.append(
@@ -495,11 +491,12 @@ class GeminiClient(BaseModelClient):
         contents.append(
             f"Remember that the frames are presented in random order. \n"
         )
+
         # Add eval images
         for i, frame in enumerate(eval_episode.frames):
             contents.append(f"Frame {counter}: ")
             contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
-            # self._to_pil(frame).save(f"images/query_frame_{i}.jpg", format="JPEG")
+            self._to_pil(frame).save(f"images2/query_frame_{i}_gtcompletion_{eval_episode.task_completion_predictions[i]:.1f}.jpg", format="JPEG")
             contents.append(f"\n")
             counter += 1
 

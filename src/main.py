@@ -1,7 +1,7 @@
 """Example script to produce GVL predictions.
 
 Run:
-    python src/main.py --config-path configs/gemini.json
+    python src/main.py --config-path configs/gemma.json
 """
 
 import argparse
@@ -268,7 +268,7 @@ def run_eval(
                 extracted_percentages=extracted_percentages,
                 model_name=model,
             )
-            time.sleep(5)
+            time.sleep(15)
 
         except Exception as e:
             logger.error(f"Error processing step {step + 1}: {e}")
