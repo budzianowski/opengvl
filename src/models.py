@@ -69,12 +69,10 @@ class BaseModelClient:
             if image.is_cuda:
                 image = image.cpu()
 
-            print(f"Converting image of type {type(image)} to PIL Image...")
             image = image.detach().numpy()
 
         # Handle different numpy array formats
         if isinstance(image, np.ndarray):
-            print(f"Image shape: {image.shape}, dtype: {image.dtype}")
             # Normalize if values are in [0, 1] range
             if image.dtype == np.float32 or image.dtype == np.float64:
                 if image.max() <= 1.0:
@@ -321,6 +319,7 @@ class KimiThinkingClient(BaseModelClient):
     """Kimi Thinking client implementation"""
 
     def __init__(self, model_id: str = "moonshotai/Kimi-VL-A3B-Thinking-2506"):
+
         logger.info(f"Loading Kimi Thinking model {model_id}...")
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -328,14 +327,8 @@ class KimiThinkingClient(BaseModelClient):
             device_map="auto",
             trust_remote_code=True,
         )
-        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
 
-    def extract_thinking_and_summary(self, text: str, bot: str = "◁think▷", eot: str = "◁/think▷") -> tuple:
-        if bot in text and eot not in text:
-            return "", ""
-        if eot in text:
-            return text[text.index(bot) + len(bot):text.index(eot)].strip(), text[text.index(eot) + len(eot) :].strip()
-        return "", text
+        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
 
     def generate_response(
         self,
@@ -344,99 +337,86 @@ class KimiThinkingClient(BaseModelClient):
         context_episodes: List[Episode],
         ) -> str:
 
-        # Collect all images and build content following Gemini client structure
+        # Follow Gemini client format - use simple content list instead of structured messages
         images = []
-        content = []
         
-        # Add initial prompt
-        content.append({"type": "text", "text": prompt})
-
+        # Start with the prompt text
+        prompt_parts = [prompt]
+        
         # Add initial scene
-        content.append({"type": "text", "text": "Initial robot scene:"})
-        initial_image = self._to_pil(eval_episode.starting_frame)
-        images.append(initial_image)
-        content.append({"type": "image", "image": len(images) - 1})
-        content.append({"type": "text", "text": "\nIn the initial robot scene, the task completion percentage is 0. \n"})
-
+        prompt_parts.append("Initial robot scene:")
+        images.append(self._to_pil(eval_episode.starting_frame))
+        prompt_parts.append("In the initial robot scene, the task completion percentage is 0.")
+        
         counter = 1
-
-        # Add context images with completion percentages
+        
+        # Add context episodes with continuous counter like Gemini client
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
             for i, (task_completion, frame) in enumerate(
                 zip(context_episode.task_completion_predictions, context_episode.frames)
             ):
-                content.append({"type": "text", "text": f"Frame {counter}: "})
-                frame_image = self._to_pil(frame)
-                images.append(frame_image)
-                content.append({"type": "image", "image": len(images) - 1})
-                content.append({"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}% \n"})
+                prompt_parts.append(f"Frame {counter}: ")
+                images.append(self._to_pil(frame))
+                prompt_parts.append(f"Task Completion Percentage: {task_completion:.1f}%")
                 counter += 1
-
-        content.append({
-            "type": "text",
-            "text": f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n"
-        })
-        content.append({
-            "type": "text",
-            "text": f"Be rigorous, precise and remember that the task completion percentage is the percentage of the task that has been completed. \n"
-        })
-        content.append({
-            "type": "text",
-            "text": f"Remember that the frames are presented in random order. \n"
-        })
         
-        # Add eval images
+        # Add query instruction matching Gemini client format
+        prompt_parts.append(
+            f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {{i}}: Task Completion Percentages:{{}}%"
+        )
+        prompt_parts.append(
+            "Be rigorous, precise and remember that the task completion percentage is the percentage of the task that has been completed."
+        )
+        prompt_parts.append(
+            "Remember that the frames are presented in random order."
+        )
+        
+        # Add eval images with continuous counter
         for i, frame in enumerate(eval_episode.frames):
-            content.append({"type": "text", "text": f"Frame {counter}: "})
-            query_image = self._to_pil(frame)
-            images.append(query_image)
-            content.append({"type": "image", "image": len(images) - 1})
-            content.append({"type": "text", "text": f"\n"})
+            prompt_parts.append(f"Frame {counter}: ")
+            images.append(self._to_pil(frame))
             counter += 1
-
-        messages = [{"role": "user", "content": content}]
-
-        # Apply chat template to get text
-        text = self.processor.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
         
-        # Process inputs with images
-        inputs = self.processor(
-            images=images, 
-            text=text, 
-            return_tensors="pt", 
-            padding=True, 
-            truncation=True
-        ).to(self.model.device)
+        # Convert to messages format but with simpler structure
+        messages = [
+            {
+                "role": "user", 
+                "content": []
+            }
+        ]
+        
+        # Interleave text and images
+        image_idx = 0
+        for part in prompt_parts:
+            if "Initial robot scene:" in part or "Frame " in part and ":" in part:
+                messages[0]["content"].append({"type": "text", "text": part})
+                if image_idx < len(images):
+                    messages[0]["content"].append({"type": "image"})
+                    image_idx += 1
+            else:
+                messages[0]["content"].append({"type": "text", "text": part})
 
+        prompt = self.processor.apply_chat_template(
+            messages,
+            add_generation_prompt=True
+        )
+        inputs = self.processor(text=prompt, images=images, return_tensors="pt").to(self.model.device, dtype=torch.bfloat16)
+        
         input_len = inputs["input_ids"].shape[-1]
+
         if input_len > 128_000:
             raise ValueError(f"Input length {input_len} exceeds maximum allowed length of 128000 tokens.")
         logger.info(f"Input length: {input_len}")
 
-        # Generate response
-        generated_ids = self.model.generate(
-            **inputs, 
-            max_new_tokens=32768, 
-            temperature=0.8
-        )
-        
-        # Trim generated ids to only new tokens
+        generated_ids = self.model.generate(**inputs, max_new_tokens=32768, temperature=0.8)
         generated_ids_trimmed = [
-            out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
+            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]
-        
-        # Decode response
         response = self.processor.batch_decode(
-            generated_ids_trimmed, 
-            skip_special_tokens=True, 
-            clean_up_tokenization_spaces=False
+            generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )[0]
 
-        OUTPUT_FORMAT = "--------Thinking--------\n{thinking}\n\n--------Summary--------\n{summary}"
-        thinking, summary = self.extract_thinking_and_summary(response)
-        result = OUTPUT_FORMAT.format(thinking=thinking, summary=summary)
-
-        return result
+        return response
 
 
 class GeminiClient(BaseModelClient):
