@@ -8,6 +8,9 @@ from typing import Literal, Optional
 
 import tyro
 from loguru import logger
+import numpy as np
+from PIL import Image
+import os
 
 from .data_loader import DataLoader, Episode
 from .models import ModelFactory
@@ -59,11 +62,14 @@ class RunConfig:
     """Path to a JSON config file. If provided, it will override the other arguments."""
 
 
-def run(args: RunConfig):
+def main(args: RunConfig):
     """Run evaluation or inference on a model."""
     if args.config_path:
         with open(args.config_path, "r") as f:
             config_data = json.load(f)
+            # Update args with config_data, but let CLI args take precedence
+            cli_args = {k: v for k, v in vars(args).items() if v != RunConfig.__dataclass_fields__[k].default}
+            config_data.update(cli_args)
             args = tyro.from_dict(RunConfig, config_data)
 
     if args.data_source == "dataset":
@@ -420,9 +426,5 @@ def plot_results(episode: Episode, results: dict, save_path: Optional[str] = Non
     plt.show()
 
 
-def main():
-    tyro.cli(run)
-
-
 if __name__ == "__main__":
-    main()
+    tyro.cli(main)
