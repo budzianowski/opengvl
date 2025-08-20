@@ -10,20 +10,35 @@ This script can:
 
 Usage:
     # Using LeRobot dataset
-    python src/inference.py --dataset-name lerobot/nyu_door_opening_surprising_effectiveness --episode-index 1 --model gemini-2.5-flash-lite-preview-06-17
-    python src/inference.py --dataset-name sam/pickup_from_pile --episode-index 1 --model gemini-2.5-flash-lite-preview-06-17
+    python src/inference.py --dataset-name lerobot/nyu_door_opening_surprising_effectiveness \
+        --episode-index 1 --model gemma-3-27b-it --num-context-episodes 1 --max-frames 15
 
     # Using image directory
     python src/inference.py --image-dir /path/to/images --prompt "open the door" --model gemini-2.5-flash-lite-preview-06-17
 
     # Using specific image files
     python src/inference.py --image-files img1.jpg img2.jpg img3.jpg --prompt "pick up the cup" --model gemini-2.5-flash-lite-preview-06-17
-"""
+
+    python src/inference.py --dataset-name dopaul/1500_chess_moves \
+        --episode-index 53 --model gemini-2.5-flash-lite-preview-06-17 --num-context-episodes 1 --camera-index 0 --max-frames 30 --no-shuffle
+
+    python src/inference.py --dataset-name Mahimana/excavator_toy_v3_dig_dump_v3_51 \
+        --episode-index 0 --model gemini-2.5-flash-lite-preview-06-17 --num-context-episodes 1 --max-frames 30 --camera-index 5 --no-shuffle
+
+    python src/inference.py --dataset-name willx0909/pickplace_joint \
+        --episode-index 0 --model gemini-2.5-flash-lite-preview-06-17 --num-context-episodes 1 --max-frames 15 --camera-index 0 --no-shuffle --num-eval-pool 10
+    
+    python src/inference.py --dataset-name Rorschach4153/so101_60_new \
+        --episode-index 93 --model gemini-2.5-flash-lite-preview-06-17 --num-context-episodes 1 --max-frames 15 --camera-index 0 --no-shuffle --num-eval-pool 10
+
+    python src/inference.py --dataset-name  cking616/aloha_flod_shirts  \
+        --episode-index 0 --model gemini-2.5-flash-lite-preview-06-17 --num-context-episodes 2 --max-frames 15 --camera-index 0 --no-shuffle --num-eval-pool 10
+
+        """
 
 import argparse
 import json
 import os
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -31,7 +46,6 @@ import numpy as np
 from loguru import logger
 from PIL import Image
 
-# Import modules from the existing codebase
 from data_loader import DataLoader, Episode, Example
 from models import ModelFactory
 from result_evaluator import ResultEvaluator
@@ -41,7 +55,7 @@ from voc_score import VOCScorer
 class InferenceRunner:
     """Main class for running inference and evaluation."""
     
-    def __init__(self, model_name: str, num_context_episodes: int = 2, max_frames: int = 20):
+    def __init__(self, model_name: str, num_context_episodes: int = 2, max_frames: int = 20, episode_index: int = None):
         """Initialize the inference runner.
         
         Args:
@@ -52,19 +66,15 @@ class InferenceRunner:
         self.model_name = model_name
         self.num_context_episodes = num_context_episodes
         self.max_frames = max_frames
-        
-        # Initialize model client
+        self.episode_index = episode_index
         self.model_client = ModelFactory.create_client(model_name)
-        
-        # Initialize result evaluator for extracting percentages
         self.result_evaluator = ResultEvaluator(expected_length=max_frames)
-        
-        # Initialize VOC scorer
         self.voc_scorer = VOCScorer()
         
     def load_from_dataset(
             self, dataset_name: str, episode_index: int, 
-            camera_index: int = 0, seed: int = 42, shuffle: bool = False
+            camera_index: int = 0, seed: int = 42, shuffle: bool = False,
+            num_eval_pool: int = 10,
         ) -> Example:
         """Load an episode from a LeRobot dataset.
         
@@ -87,16 +97,13 @@ class InferenceRunner:
             num_frames=self.max_frames,
             camera_index=camera_index,
             seed=seed,
-            max_episodes=max(100, episode_index + 10),  # Ensure we can load the requested episode
-            shuffle=shuffle
+            num_eval_pool=10,
+            max_episodes=max(100, episode_index + 10),
+            shuffle=shuffle,
+            episode_index=episode_index,
         )
         
-        # Load the specific episode
-        examples = data_loader.load_examples(episode_index + 1)
-        if len(examples) <= episode_index:
-            raise ValueError(f"Episode {episode_index} not found in dataset")
-            
-        return examples[episode_index]
+        return data_loader.load_example(episode_index)
     
     def load_from_images(
             self, image_paths: list[str], prompt: str, 
@@ -499,6 +506,8 @@ def main():
                        help="Camera index for dataset loading (default: 0)")
     parser.add_argument("--shuffle", action="store_true", default=True,
                        help="Shuffle images (for image inputs)")
+    parser.add_argument("--no-shuffle", dest="shuffle", action="store_false",
+                       help="Do not shuffle images (for image inputs)")
     parser.add_argument("--seed", type=int, default=42,
                        help="Random seed (default: 42)")
     parser.add_argument("--output-dir", type=str, default="inference_results",
@@ -507,98 +516,76 @@ def main():
                        help="Save plot to file")
     parser.add_argument("--save-results", action="store_true",
                        help="Save results to JSON file")
-    
+    parser.add_argument("--num-eval-pool", type=int, default=50,
+                       help="Number of evaluation episodes to load")
     args = parser.parse_args()
     
-    # Validate arguments
     if (args.image_dir or args.image_files) and not args.prompt:
         parser.error("--prompt is required when using --image-dir or --image-files")
     
-    # Initialize inference runner
-    try:
-        inference_runner = InferenceRunner(
-            model_name=args.model,
-            num_context_episodes=args.num_context_episodes,
-            max_frames=args.max_frames
+    inference_runner = InferenceRunner(
+        model_name=args.model,
+        num_context_episodes=args.num_context_episodes,
+        max_frames=args.max_frames,
+        episode_index=args.episode_index,
+    )
+
+    if args.dataset_name:
+        logger.info(f"Loading from dataset: {args.dataset_name}")
+        example = inference_runner.load_from_dataset(
+            dataset_name=args.dataset_name,
+            episode_index=args.episode_index,
+            camera_index=args.camera_index,
+            seed=args.seed,
+            shuffle=args.shuffle,
+            num_eval_pool=args.num_eval_pool
         )
-    except Exception as e:
-        logger.error(f"Failed to initialize inference runner: {e}")
-        sys.exit(1)
-    
-    # Load data
-    try:
-        if args.dataset_name:
-            logger.info(f"Loading from dataset: {args.dataset_name}")
-            example = inference_runner.load_from_dataset(
-                dataset_name=args.dataset_name,
-                episode_index=args.episode_index,
-                camera_index=args.camera_index,
-                seed=args.seed,
-                shuffle=args.shuffle
-            )
-            episode = example.eval_episode
-            context_episodes = example.context_episodes
-            
-        elif args.image_dir:
-            logger.info(f"Loading from directory: {args.image_dir}")
-            episode = inference_runner.load_from_directory(
-                image_dir=args.image_dir,
-                prompt=args.prompt,
-                shuffle=args.shuffle,
-                seed=args.seed
-            )
-            context_episodes = []
-            
-        elif args.image_files:
-            logger.info(f"Loading from image files: {args.image_files}")
-            episode = inference_runner.load_from_images(
-                image_paths=args.image_files,
-                prompt=args.prompt,
-                shuffle=args.shuffle,
-                seed=args.seed
-            )
-            context_episodes = []
-            
-    except Exception as e:
-        logger.error(f"Failed to load data: {e}")
-        sys.exit(1)
-    
-    # Run inference
-    try:
-        logger.info("Starting inference...")
-        results = inference_runner.run_inference(episode, context_episodes)
+        episode = example.eval_episode
+        context_episodes = example.context_episodes
         
-        if "error" in results:
-            logger.error(f"Inference failed: {results['error']}")
-        else:
-            logger.info(f"Inference completed successfully!")
-            logger.info(f"VOC Score: {results['voc_score']:.3f}")
-            logger.info(f"Extracted {len(results['extracted_percentages'])} predictions")
-            
-    except Exception as e:
-        logger.error(f"Inference failed: {e}")
-        sys.exit(1)
+    elif args.image_dir:
+        logger.info(f"Loading from directory: {args.image_dir}")
+        episode = inference_runner.load_from_directory(
+            image_dir=args.image_dir,
+            prompt=args.prompt,
+            shuffle=args.shuffle,
+            seed=args.seed
+        )
+        context_episodes = []
+        
+    elif args.image_files:
+        logger.info(f"Loading from image files: {args.image_files}")
+        episode = inference_runner.load_from_images(
+            image_paths=args.image_files,
+            prompt=args.prompt,
+            shuffle=args.shuffle,
+            seed=args.seed
+        )
+        context_episodes = []
+
+    logger.info("Starting inference...")
+    results = inference_runner.run_inference(episode, context_episodes)
     
-    # Create output directory
+    if "error" in results:
+        logger.error(f"Inference failed: {results['error']}")
+    else:
+        logger.info(f"Inference completed successfully!")
+        logger.info(f"VOC Score: {results['voc_score']:.3f}")
+        logger.info(f"Extracted {len(results['extracted_percentages'])} predictions")
+
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # Save results if requested
     if args.save_results:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         results_path = os.path.join(args.output_dir, f"inference_results_{timestamp}.json")
         inference_runner.save_results(results, results_path)
     
-    # Plot results
     save_plot_path = None
     if args.save_plot:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") if not args.save_results else timestamp
         save_plot_path = os.path.join(args.output_dir, f"inference_plot_{timestamp}.png")
     
-    try:
-        inference_runner.plot_results(episode, results, save_plot_path)
-    except Exception as e:
-        logger.error(f"Failed to create plot: {e}")
-    
+    inference_runner.plot_results(episode, results, save_plot_path)
     logger.info("Inference completed!")
 
 

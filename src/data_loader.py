@@ -41,8 +41,9 @@ class DataLoader:
         camera_index: int = 0,
         seed: int = 42,
         max_episodes: int = 100,
-        num_eval_pool: int = 50,
+        num_eval_pool: int = 10,
         shuffle: bool = False,
+        episode_index: int = None,
     ):
         """Wrapper around LeRobotDataset to load examples from the dataset.
 
@@ -132,7 +133,7 @@ class DataLoader:
             episodes.append(episode)
         return episodes
 
-    def load_example(self) -> Example | None:
+    def load_example(self, episode_index: int = None) -> Example | None:
         """
         Loads a single example with one eval episode and a randomly sampled,
         hierarchical set of context episodes.
@@ -141,7 +142,10 @@ class DataLoader:
             print("All evaluation episodes have been used.")
             return None
 
-        eval_episode_index = self.eval_episode_indices[self.next_eval_idx]
+        if episode_index is None:
+            eval_episode_index = self.eval_episode_indices[self.next_eval_idx]
+        else:
+            eval_episode_index = episode_index
         self.next_eval_idx += 1
 
         eval_episode = self._load_episodes_from_indices(

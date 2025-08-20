@@ -63,7 +63,7 @@ def filter_datasets_by_date(
     return filtered_datasets
 
 
-def get_monthly_accumulation(hub_api: HfApi, start_date: str = "2024-06-01") -> Tuple[List[str], List[int], Dict]:
+def get_monthly_accumulation(hub_api: HfApi, start_date: str = "2025-01-01") -> Tuple[List[str], List[int], Dict]:
     """Get monthly accumulation of LeRobot datasets from start_date to today."""
     
     all_datasets = filter_datasets_by_date(
@@ -74,7 +74,23 @@ def get_monthly_accumulation(hub_api: HfApi, start_date: str = "2024-06-01") -> 
         sort_by="created_at",
         descending=False
     )
-    
+    def extract_episodes(dataset):
+        # if hasattr(dataset, "episodes") and dataset.episodes is not None:
+        #     return dataset.episodes
+        desc = getattr(dataset, "description", "")
+        for key in ["total_episodes", "num_episodes"]:
+            idx = desc.find(f'"{key}":')
+            if idx != -1:
+                try:
+                    val = int(desc[idx:].split(":",1)[1].split(",")[0].strip().strip('"'))
+                    return val
+                except Exception:
+                    continue
+        return 0
+
+    all_episodes = sum(extract_episodes(dataset) for dataset in all_datasets)
+    print(f"Total episodes: {all_episodes}")
+    breakpoint()
     start_dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
     current_dt = datetime.now(timezone.utc)
     
@@ -116,53 +132,148 @@ def get_monthly_accumulation(hub_api: HfApi, start_date: str = "2024-06-01") -> 
     return month_labels, cumulative_counts, detailed_data
 
 
-def plot_accumulation(month_labels: List[str], cumulative_counts: List[int], 
-                     detailed_data: Dict, save_path: str = None):
-    """Create visualization of dataset accumulation over time."""
+def setup_plot_style():
+    """Set up publication-ready plot styling."""
+    plt.style.use('seaborn-v0_8-whitegrid')
+    plt.rcParams.update({
+        'font.size': 11,
+        'font.family': 'serif',
+        'font.serif': ['Times New Roman', 'DejaVu Serif'],
+        'axes.linewidth': 1.2,
+        'axes.spines.left': True,
+        'axes.spines.bottom': True,
+        'axes.spines.top': False,
+        'axes.spines.right': False,
+        'xtick.direction': 'in',
+        'ytick.direction': 'in',
+        'xtick.major.size': 4,
+        'ytick.major.size': 4,
+        'grid.alpha': 0.3,
+        'grid.linewidth': 0.8,
+        'legend.frameon': True,
+        'legend.framealpha': 0.9,
+        'legend.facecolor': 'white',
+        'legend.edgecolor': 'black'
+    })
+
+
+def plot_cumulative_growth(month_labels: List[str], cumulative_counts: List[int], 
+                          save_path: str = None):
+    """Create cumulative dataset growth plot."""
+    setup_plot_style()
     
     month_dates = [datetime.strptime(label, "%Y-%m") for label in month_labels]
     
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     
-    ax1.plot(month_dates, cumulative_counts, marker='o', linewidth=2, markersize=6, color='blue')
-    ax1.set_title('LeRobot Dataset Accumulation Over Time', fontsize=16, fontweight='bold')
-    ax1.set_xlabel('Month', fontsize=12)
-    ax1.set_ylabel('Cumulative Number of Datasets', fontsize=12)
-    ax1.grid(True, alpha=0.3)
+    # Enhanced cumulative plot
+    line = ax.plot(month_dates, cumulative_counts, marker='o', linewidth=2.5, 
+                   markersize=7, color='#2E86AB', markerfacecolor='white', 
+                   markeredgewidth=2, markeredgecolor='#2E86AB', 
+                   label='Cumulative Datasets')
     
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
-    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
+    # Add subtle fill under curve
+    ax.fill_between(month_dates, cumulative_counts, alpha=0.2, color='#2E86AB')
     
+    ax.set_title('LeRobot Dataset Growth on Hugging Face', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel('Time Period', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Cumulative Number of Datasets', fontsize=12, fontweight='bold')
+    ax.grid(True, alpha=0.4, linestyle='-', linewidth=0.5)
+    
+    # Enhanced annotations - only show every 3rd point to avoid clutter
     for i, (date, count) in enumerate(zip(month_dates, cumulative_counts)):
-        if i % 2 == 0:
-            ax1.annotate(f'{count}', (date, count), textcoords="offset points", 
-                        xytext=(0,10), ha='center', fontsize=9)
+        if i % 3 == 0 or i == len(month_dates) - 1:
+            ax.annotate(f'{count}', (date, count), textcoords="offset points", 
+                        xytext=(0, 12), ha='center', fontsize=9, fontweight='bold',
+                        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                                edgecolor='#2E86AB', alpha=0.8))
     
-    monthly_new = [detailed_data[label]['new_datasets'] for label in month_labels]
-    bars = ax2.bar(month_dates, monthly_new, alpha=0.7, color='green', width=20)
-    ax2.set_title('New LeRobot Datasets Added Each Month', fontsize=14, fontweight='bold')
-    ax2.set_xlabel('Month', fontsize=12)
-    ax2.set_ylabel('New Datasets Added', fontsize=12)
-    ax2.grid(True, alpha=0.3, axis='y')
+    # Enhanced x-axis formatting
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
     
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
-    ax2.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
-    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
-    
-    for bar, count in zip(bars, monthly_new):
-        if count > 0:
-            height = bar.get_height()
-            ax2.annotate(f'{count}', xy=(bar.get_x() + bar.get_width()/2, height),
-                        xytext=(0, 3), textcoords="offset points", ha='center', va='bottom')
+    # Add summary statistics box
+    total_datasets = cumulative_counts[-1] if cumulative_counts else 0
+    stats_text = f'Total Datasets: {total_datasets}'
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=11,
+             verticalalignment='top', bbox=dict(boxstyle='round,pad=0.5', 
+             facecolor='lightgray', alpha=0.8))
     
     plt.tight_layout()
     
     if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"Plot saved to: {save_path}")
+        base_path = save_path.replace('.png', '') + '_cumulative'
+        plt.savefig(f'{base_path}.png', dpi=300, bbox_inches='tight', facecolor='white')
+        plt.savefig(f'{base_path}.pdf', bbox_inches='tight', facecolor='white')
+        plt.savefig(f'{base_path}.svg', bbox_inches='tight', facecolor='white')
+        print(f"Cumulative plot saved as: {base_path}.{{png,pdf,svg}}")
     
     plt.show()
+
+
+def plot_monthly_additions(month_labels: List[str], detailed_data: Dict, 
+                          save_path: str = None):
+    """Create monthly dataset additions bar chart."""
+    setup_plot_style()
+    
+    month_dates = [datetime.strptime(label, "%Y-%m") for label in month_labels]
+    monthly_new = [detailed_data[label]['new_datasets'] for label in month_labels]
+    
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    
+    # Create gradient colors for bars
+    colors = plt.cm.viridis([x/max(monthly_new) if max(monthly_new) > 0 else 0 for x in monthly_new])
+    
+    bars = ax.bar(month_dates, monthly_new, alpha=0.8, color=colors, 
+                  width=20, edgecolor='black', linewidth=0.8)
+    
+    ax.set_title('Monthly LeRobot Dataset Additions', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel('Time Period', fontsize=12, fontweight='bold')
+    ax.set_ylabel('New Datasets Added', fontsize=12, fontweight='bold')
+    ax.grid(True, alpha=0.4, axis='y', linestyle='-', linewidth=0.5)
+    
+    # Enhanced x-axis formatting
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %Y'))
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+    
+    # Enhanced bar annotations
+    for bar, count in zip(bars, monthly_new):
+        if count > 0:
+            height = bar.get_height()
+            ax.annotate(f'{count}', xy=(bar.get_x() + bar.get_width()/2, height),
+                        xytext=(0, 5), textcoords="offset points", ha='center', va='bottom',
+                        fontsize=9, fontweight='bold',
+                        bbox=dict(boxstyle='round,pad=0.2', facecolor='white', 
+                                edgecolor='gray', alpha=0.7))
+    
+    # Add summary statistics box
+    avg_monthly = sum(monthly_new) / len(monthly_new) if monthly_new else 0
+    max_monthly = max(monthly_new) if monthly_new else 0
+    
+    stats_text = f'Avg/Month: {avg_monthly:.1f}\nPeak Month: {max_monthly}'
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=11,
+             verticalalignment='top', bbox=dict(boxstyle='round,pad=0.5', 
+             facecolor='lightgray', alpha=0.8))
+    
+    plt.tight_layout()
+    
+    if save_path:
+        base_path = save_path.replace('.png', '') + '_monthly'
+        plt.savefig(f'{base_path}.png', dpi=300, bbox_inches='tight', facecolor='white')
+        plt.savefig(f'{base_path}.pdf', bbox_inches='tight', facecolor='white')
+        plt.savefig(f'{base_path}.svg', bbox_inches='tight', facecolor='white')
+        print(f"Monthly plot saved as: {base_path}.{{png,pdf,svg}}")
+    
+    plt.show()
+
+
+def plot_accumulation(month_labels: List[str], cumulative_counts: List[int], 
+                     detailed_data: Dict, save_path: str = None):
+    """Create both cumulative and monthly plots separately."""
+    plot_cumulative_growth(month_labels, cumulative_counts, save_path)
+    plot_monthly_additions(month_labels, detailed_data, save_path)
 
 
 def print_monthly_summary(detailed_data: Dict):
@@ -253,7 +364,7 @@ def main():
     hub_api = HfApi()
     
     month_labels, cumulative_counts, detailed_data = get_monthly_accumulation(
-        hub_api, start_date="2024-06-01"
+        hub_api, start_date="2025-03-01"
     )
     
     print_monthly_summary(detailed_data)
