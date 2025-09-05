@@ -28,20 +28,12 @@ from transformers import (
 from dotenv import load_dotenv
 from data_loader import Episode
 
-
 # third-party imports
-try:
-    import openai
-except ImportError:
-    openai = None
+import openai
 
-try:
-    from google import genai
-    from google.genai import types
-except ImportError:
-    genai = None
+from google import genai
+from google.genai import types
 
-load_dotenv()
 
 class BaseModelClient:
     """Base class for all model clients"""
@@ -111,9 +103,6 @@ class OpenAIClient(BaseModelClient):
     """OpenAI client implementation"""
 
     def __init__(self, model_id: str = "gpt-4o-mini", detail: str = "high"):
-        if openai is None:
-            raise ImportError("OpenAI library is not installed. Please install it with 'pip install openai'.")
-
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model_id = model_id
         self.detail = detail
@@ -423,8 +412,6 @@ class GeminiClient(BaseModelClient):
     """Gemini client implementation"""
 
     def __init__(self, model_name: str = "gemini-2.5-flash-lite-preview-06-17"):
-        if genai is None:
-            raise ImportError("Google GenAI package not installed")
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.model_name = model_name
 
@@ -456,7 +443,6 @@ class GeminiClient(BaseModelClient):
                 contents.append(f"Frame {counter}: ")
                 contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
                 contents.append(f"Task Completion Percentage: {task_completion:.1f}% \n")
-                # self._to_pil(frame).save(f"images2/example_{ctx_episode_idx+1}__frame_{i+1}_taskcompletion_{task_completion:.1f}.jpg", format="JPEG")
                 counter += 1
 
         # contents.append(
