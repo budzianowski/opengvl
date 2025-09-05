@@ -11,15 +11,13 @@ import base64
 import io
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Any
+from typing import Any, List
 
 import numpy as np
-from PIL import Image
-
 from data_loader import Episode
+from PIL import Image
 from utils.constants import IMG_SIZE
 from utils.errors import ImageEncodingError
-
 
 
 class BaseModelClient(ABC):
@@ -29,6 +27,7 @@ class BaseModelClient(ABC):
     They inherit image conversion & encoding helpers to produce standardized
     244x244 PNG base64 strings for multimodal APIs.
     """
+
     @abstractmethod
     def generate_response(
         self,
@@ -126,5 +125,3 @@ class BaseModelClient(ABC):
         buffer = io.BytesIO()
         pil_image.save(buffer, format="PNG")
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
-
-

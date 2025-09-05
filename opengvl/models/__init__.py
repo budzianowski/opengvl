@@ -1,10 +1,11 @@
 """Model clients package public API."""
-from .base import BaseModelClient, IMG_SIZE, MAX_TOKENS_TO_GENERATE, ImageEncodingError
-from .openai import OpenAIClient
+
+from .base import IMG_SIZE, MAX_TOKENS_TO_GENERATE, BaseModelClient, ImageEncodingError
+from .factory import ModelFactory
 from .gemini import GeminiClient
 from .gemma import GemmaClient
 from .kimi import KimiThinkingClient
-from .factory import ModelFactory
+from .openai import OpenAIClient
 
 __all__ = [
     "BaseModelClient",

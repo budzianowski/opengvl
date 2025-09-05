@@ -1,8 +1,7 @@
 """Config for full evaluation of gemma-3-27b-it on all datasets"""
 
-from src.main import run_eval
 from loguru import logger
-
+from src.main import run_eval
 
 DATASET_LIST = [
     "lerobot/nyu_door_opening_surprising_effectiveness",

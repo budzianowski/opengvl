@@ -9,8 +9,15 @@ from abc import abstractmethod
 from typing import List
 
 import numpy as np
+
+# third-party imports
+import openai
 import torch
 import torchvision.transforms as T
+from data_loader import Episode
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from loguru import logger
 from PIL import Image
 from torchvision.transforms import InterpolationMode
@@ -25,14 +32,6 @@ from transformers import (
     BitsAndBytesConfig,
     Gemma3ForConditionalGeneration,
 )
-from dotenv import load_dotenv
-from data_loader import Episode
-
-# third-party imports
-import openai
-
-from google import genai
-from google.genai import types
 
 from .base import BaseModelClient
 
@@ -88,4 +87,3 @@ class GeminiClient(BaseModelClient):
 
         response = self.client.models.generate_content(model=self.model_name, contents=contents)
         return response.text
-

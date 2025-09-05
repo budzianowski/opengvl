@@ -78,8 +78,8 @@ class DataLoader:
         if self.max_episodes <= self.num_eval_pool:
             raise ValueError("Not enough episodes for context and evaluation split.")
 
-        self.eval_episode_indices = all_indices[:self.num_eval_pool]
-        self.context_episode_indices_pool = all_indices[self.num_eval_pool:]
+        self.eval_episode_indices = all_indices[: self.num_eval_pool]
+        self.context_episode_indices_pool = all_indices[self.num_eval_pool :]
         self.next_eval_idx = 0
 
     def _load_episodes_from_indices(self, episode_indices: list[int]) -> list[Episode]:
@@ -119,7 +119,7 @@ class DataLoader:
                 shuffled_indices = self.rng.permutation(len(context_frames_indices))
                 shuffled_frames = [selected_frames[i] for i in shuffled_indices]
                 shuffled_completion_prediction = completion_prediction[shuffled_indices]
- 
+
             episode = Episode(
                 starting_frame=frames[0],
                 instruction=dataset[from_idx]["task"],
@@ -128,7 +128,7 @@ class DataLoader:
                 shuffled_frames_indices=shuffled_indices.tolist(),
                 task_completion_predictions=shuffled_completion_prediction.tolist(),
                 unshuffled_task_completion_predictions=completion_prediction.tolist(),
-                frames=shuffled_frames
+                frames=shuffled_frames,
             )
             episodes.append(episode)
         return episodes
@@ -148,9 +148,7 @@ class DataLoader:
             eval_episode_index = episode_index
         self.next_eval_idx += 1
 
-        eval_episode = self._load_episodes_from_indices(
-            episode_indices=[eval_episode_index]
-        )[0]
+        eval_episode = self._load_episodes_from_indices(episode_indices=[eval_episode_index])[0]
 
         # Create a dedicated, deterministic RNG for context sampling for this specific eval episode.
         # This ensures that for the same eval episode, the context is sampled identically
@@ -164,9 +162,7 @@ class DataLoader:
         num_context = min(self.num_context_episodes, len(shuffled_context_pool))
         context_indices = shuffled_context_pool[:num_context]
 
-        context_episodes = self._load_episodes_from_indices(
-            episode_indices=context_indices.tolist()
-        )
+        context_episodes = self._load_episodes_from_indices(episode_indices=context_indices.tolist())
 
         return Example(eval_episode=eval_episode, context_episodes=context_episodes)
 
@@ -397,6 +393,7 @@ class DataLoader:
         plt.savefig(f"episode_{episode_index}_frames.png")
         plt.show()
 
+
 if __name__ == "__main__":
     dl = DataLoader(
         dataset_name="lerobot/nyu_door_opening_surprising_effectiveness",
@@ -413,4 +410,3 @@ if __name__ == "__main__":
     dl.plot_single_episode(example=example, episode_idx=1, plot_eval=False)
     # dl.plot_whole_episode(episode_index=example.eval_episode.episode_index)
     # dl.plot_frames(episode_index=50, frame_indices=[121, 115, 76, 289, 290, 74, 282, 142, 296, 104, 93, 269, 236, 160, 50, 222, 149, 3, 197, 127])
-

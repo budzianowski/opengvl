@@ -9,8 +9,15 @@ from abc import abstractmethod
 from typing import List
 
 import numpy as np
+
+# third-party imports
+import openai
 import torch
 import torchvision.transforms as T
+from data_loader import Episode
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from loguru import logger
 from PIL import Image
 from torchvision.transforms import InterpolationMode
@@ -25,14 +32,6 @@ from transformers import (
     BitsAndBytesConfig,
     Gemma3ForConditionalGeneration,
 )
-from dotenv import load_dotenv
-from data_loader import Episode
-
-# third-party imports
-import openai
-
-from google import genai
-from google.genai import types
 
 
 class BaseModelClient:
@@ -161,7 +160,8 @@ class OpenAIClient(BaseModelClient):
         content.append(
             {
                 "type": "input_text",
-                "text": f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n",
+                "text": f"Now, for the task of {eval_episode.instruction}"
+                + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n",
             }
         )
         content.append(
@@ -277,8 +277,6 @@ class GemmaClient(BaseModelClient):
                 [
                     {"type": "text", "text": f"Frame {i}: "},
                     {"type": "image", "base64": self._to_pil(frame)},
-
-
                 ]
             )
 
@@ -324,21 +322,21 @@ class KimiThinkingClient(BaseModelClient):
         prompt: str,
         eval_episode: Episode,
         context_episodes: List[Episode],
-        ) -> str:
+    ) -> str:
 
         # Follow Gemini client format - use simple content list instead of structured messages
         images = []
-        
+
         # Start with the prompt text
         prompt_parts = [prompt]
-        
+
         # Add initial scene
         prompt_parts.append("Initial robot scene:")
         images.append(self._to_pil(eval_episode.starting_frame))
         prompt_parts.append("In the initial robot scene, the task completion percentage is 0.")
-        
+
         counter = 1
-        
+
         # Add context episodes with continuous counter like Gemini client
         for ctx_episode_idx, context_episode in enumerate(context_episodes):
             for i, (task_completion, frame) in enumerate(
@@ -348,7 +346,7 @@ class KimiThinkingClient(BaseModelClient):
                 images.append(self._to_pil(frame))
                 prompt_parts.append(f"Task Completion Percentage: {task_completion:.1f}%")
                 counter += 1
-        
+
         # Add query instruction matching Gemini client format
         prompt_parts.append(
             f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {{i}}: Task Completion Percentages:{{}}%"
@@ -356,24 +354,17 @@ class KimiThinkingClient(BaseModelClient):
         prompt_parts.append(
             "Be rigorous, precise and remember that the task completion percentage is the percentage of the task that has been completed."
         )
-        prompt_parts.append(
-            "Remember that the frames are presented in random order."
-        )
-        
+        prompt_parts.append("Remember that the frames are presented in random order.")
+
         # Add eval images with continuous counter
         for i, frame in enumerate(eval_episode.frames):
             prompt_parts.append(f"Frame {counter}: ")
             images.append(self._to_pil(frame))
             counter += 1
-        
+
         # Convert to messages format but with simpler structure
-        messages = [
-            {
-                "role": "user", 
-                "content": []
-            }
-        ]
-        
+        messages = [{"role": "user", "content": []}]
+
         # Interleave text and images
         image_idx = 0
         for part in prompt_parts:
@@ -385,12 +376,11 @@ class KimiThinkingClient(BaseModelClient):
             else:
                 messages[0]["content"].append({"type": "text", "text": part})
 
-        prompt = self.processor.apply_chat_template(
-            messages,
-            add_generation_prompt=True
+        prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True)
+        inputs = self.processor(text=prompt, images=images, return_tensors="pt").to(
+            self.model.device, dtype=torch.bfloat16
         )
-        inputs = self.processor(text=prompt, images=images, return_tensors="pt").to(self.model.device, dtype=torch.bfloat16)
-        
+
         input_len = inputs["input_ids"].shape[-1]
 
         if input_len > 128_000:
@@ -398,9 +388,7 @@ class KimiThinkingClient(BaseModelClient):
         logger.info(f"Input length: {input_len}")
 
         generated_ids = self.model.generate(**inputs, max_new_tokens=32768, temperature=0.8)
-        generated_ids_trimmed = [
-            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
+        generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         response = self.processor.batch_decode(
             generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )[0]
@@ -449,20 +437,22 @@ class GeminiClient(BaseModelClient):
         #     f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Frame Description: {}, Task Completion Percentages:{}% \n"
         # )
         contents.append(
-            f"Now, for the task of {eval_episode.instruction}" + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n"
+            f"Now, for the task of {eval_episode.instruction}"
+            + ", output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {i}: Task Completion Percentages:{}% \n"
         )
         contents.append(
             f"Be rigorous, precise and remember that the task completion percentage is the percentage of the task that has been completed. \n"
         )
-        contents.append(
-            f"Remember that the frames are presented in random order. \n"
-        )
+        contents.append(f"Remember that the frames are presented in random order. \n")
 
         # Add eval images
         for i, frame in enumerate(eval_episode.frames):
             contents.append(f"Frame {counter}: ")
             contents.append(types.Part.from_bytes(data=self.encode_image(frame), mime_type="image/png"))
-            self._to_pil(frame).save(f"images2/query_frame_{i}_gtcompletion_{eval_episode.task_completion_predictions[i]:.1f}.jpg", format="JPEG")
+            self._to_pil(frame).save(
+                f"images2/query_frame_{i}_gtcompletion_{eval_episode.task_completion_predictions[i]:.1f}.jpg",
+                format="JPEG",
+            )
             contents.append(f"\n")
             counter += 1
 

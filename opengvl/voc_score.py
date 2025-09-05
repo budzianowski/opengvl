@@ -1,11 +1,13 @@
 """ VOC score calculator """
+
+import argparse
 import json
 from pathlib import Path
-import numpy as np
-import argparse
-from scipy.stats import spearmanr
+
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+from scipy.stats import spearmanr
 
 
 class VOCScorer:
@@ -16,17 +18,13 @@ class VOCScorer:
     to compute VOC scores, derives key statistics, and generates a histogram of
     the score distribution.
     """
+
     def __init__(self):
         self.voc_scores = []
-        self.skipped_stats = {
-            "empty_preds": 0,
-            "no_indices": 0,
-            "mismatch_length": 0,
-            "total_processed": 0
-        }
+        self.skipped_stats = {"empty_preds": 0, "no_indices": 0, "mismatch_length": 0, "total_processed": 0}
 
     def _calculate_voc(self, chronologically_ordered_preds: list[float]) -> float:
-    
+
         predicted_values = np.array(chronologically_ordered_preds)
         T = len(predicted_values)
 
@@ -53,7 +51,7 @@ class VOCScorer:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        with file_path.open('r') as f:
+        with file_path.open("r") as f:
             for line in f:
                 self.skipped_stats["total_processed"] += 1
                 rec = json.loads(line)
@@ -80,11 +78,11 @@ class VOCScorer:
                 except IndexError:
                     self.skipped_stats["mismatch_length"] += 1
                     continue
-                
+
                 # --- Calculate and store VOC score ---
                 voc = self._calculate_voc(chrono_preds)
                 self.voc_scores.append(voc)
-    
+
     def get_statistics(self) -> dict:
         """
         Calculates descriptive statistics for the collected VOC scores.
@@ -93,9 +91,7 @@ class VOCScorer:
             A dictionary containing key statistics.
         """
         if not self.voc_scores:
-            return {
-                "message": "No VOC scores were calculated. Cannot generate stats."
-            }
+            return {"message": "No VOC scores were calculated. Cannot generate stats."}
 
         scores = np.array(self.voc_scores)
         stats = {
@@ -105,7 +101,7 @@ class VOCScorer:
             "std_dev": np.std(scores),
             "min": np.min(scores),
             "max": np.max(scores),
-            "skipped_counts": self.skipped_stats
+            "skipped_counts": self.skipped_stats,
         }
         return stats
 
@@ -121,29 +117,29 @@ class VOCScorer:
             print("No VOC scores available to plot.")
             return
 
-        plt.style.use('seaborn-v0_8-whitegrid')
+        plt.style.use("seaborn-v0_8-whitegrid")
         fig, ax = plt.subplots(figsize=(10, 6))
-        
-        sns.histplot(self.voc_scores, kde=True, ax=ax, bins=20, color='skyblue', edgecolor='black')
-        
+
+        sns.histplot(self.voc_scores, kde=True, ax=ax, bins=20, color="skyblue", edgecolor="black")
+
         stats = self.get_statistics()
-        mean_score = stats['mean']
-        median_score = stats['median']
-        
-        ax.axvline(mean_score, color='red', linestyle='--', linewidth=2, label=f'Mean: {mean_score:.2f}')
-        ax.axvline(median_score, color='green', linestyle='-', linewidth=2, label=f'Median: {median_score:.2f}')
-        
-        ax.set_title(title, fontsize=16, weight='bold')
+        mean_score = stats["mean"]
+        median_score = stats["median"]
+
+        ax.axvline(mean_score, color="red", linestyle="--", linewidth=2, label=f"Mean: {mean_score:.2f}")
+        ax.axvline(median_score, color="green", linestyle="-", linewidth=2, label=f"Median: {median_score:.2f}")
+
+        ax.set_title(title, fontsize=16, weight="bold")
         ax.set_xlabel("VOC Score", fontsize=12)
         ax.set_ylabel("Frequency", fontsize=12)
         ax.legend()
-        
+
         plt.tight_layout()
-        
+
         if save_path:
             plt.savefig(save_path)
             print(f"Plot saved to {save_path}")
-            
+
         plt.show()
 
 
@@ -168,7 +164,6 @@ if __name__ == "__main__":
             else:
                 print(f"{key}: {value:.4f}" if isinstance(value, float) else f"{key}: {value}")
         print("--------------------------\n")
-
 
         scorer.plot_histogram(save_path="voc_distribution.png", title=f"VOC Score Distribution for {args.file_path}")
 

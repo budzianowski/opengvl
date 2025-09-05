@@ -2,9 +2,10 @@
 
 import json
 import os
+import time
+
 from google import genai
 from google.genai import types
-import time
 
 
 class ResultEvaluator:
@@ -12,6 +13,7 @@ class ResultEvaluator:
     Evaluates a model's text response to extract a list of percentages and
     validates if the list has the expected length.
     """
+
     def __init__(
         self,
         model_name: str = "gemini-2.5-flash-lite-preview-06-17",
@@ -85,7 +87,7 @@ Answer:
                         temperature=self.temperature,
                         max_output_tokens=self.max_new_tokens,
                     ),
-                    contents=model_response_text
+                    contents=model_response_text,
                 )
 
                 response_content = response.text
@@ -97,7 +99,7 @@ Answer:
                 json_response = json.loads(response_content)
 
                 prediction = json_response.get("prediction", [])
-                
+
                 is_valid_length = len(prediction) == self.expected_length
                 return {"prediction": prediction, "length_is_valid": is_valid_length}
 
@@ -108,11 +110,13 @@ Answer:
                     time.sleep(4)
                 else:
                     return {"prediction": [], "length_is_valid": False}
-                
 
-if __name__ == "__main__":  
+
+if __name__ == "__main__":
     result_evaluator = ResultEvaluator()
-    x = result_evaluator.extract_and_validate("Frame 1: The robot is approaching the cup. Task Completion: 5% Frame 2: The robot is grasping the cup. Task Completion: 30% Frame 3: The robot is lifting the cup. Task Completion: 60% Frame 4: The robot is pouring the liquid. Task Completion: 80% Frame 5: The liquid is flowing into the cup. Task Completion: 90% Frame 6: The pouring is almost complete. Task Completion: 95% Frame 7: The robot is retracting its arm. Task Completion: 98% Frame 8: The robot is returning to its initial position. Task Completion: 99% Frame 9: The robot is back to its initial position. Task Completion: 99% Frame 10: The robot is back to its initial position. Task Completion: 99% Frame 11: The robot is back to its initial position. Task Completion: 99% Frame 12: The robot is back to its initial position. Task Completion: 99% Frame 13: The robot is back to its initial position. Task Completion: 99% Frame 14: The robot is back to its initial position. Task Completion: 99% Frame 15: The robot is back to its initial position. Task Completion: 99% Frame 16: The robot is back to its initial position. Task Completion: 99% Frame 17: The robot is back to its initial position. Task Completion: 99% Frame 18: The robot is back to its initial position. Task Completion: 99% Frame 19: The robot is back to its initial position. Task Completion: 99% Frame 20: The robot is back to its initial position. Task Completion: 100%. Final Task Completion Percentage: 88.0%")
+    x = result_evaluator.extract_and_validate(
+        "Frame 1: The robot is approaching the cup. Task Completion: 5% Frame 2: The robot is grasping the cup. Task Completion: 30% Frame 3: The robot is lifting the cup. Task Completion: 60% Frame 4: The robot is pouring the liquid. Task Completion: 80% Frame 5: The liquid is flowing into the cup. Task Completion: 90% Frame 6: The pouring is almost complete. Task Completion: 95% Frame 7: The robot is retracting its arm. Task Completion: 98% Frame 8: The robot is returning to its initial position. Task Completion: 99% Frame 9: The robot is back to its initial position. Task Completion: 99% Frame 10: The robot is back to its initial position. Task Completion: 99% Frame 11: The robot is back to its initial position. Task Completion: 99% Frame 12: The robot is back to its initial position. Task Completion: 99% Frame 13: The robot is back to its initial position. Task Completion: 99% Frame 14: The robot is back to its initial position. Task Completion: 99% Frame 15: The robot is back to its initial position. Task Completion: 99% Frame 16: The robot is back to its initial position. Task Completion: 99% Frame 17: The robot is back to its initial position. Task Completion: 99% Frame 18: The robot is back to its initial position. Task Completion: 99% Frame 19: The robot is back to its initial position. Task Completion: 99% Frame 20: The robot is back to its initial position. Task Completion: 100%. Final Task Completion Percentage: 88.0%"
+    )
 
     assert x["length_is_valid"] == True
     assert x["prediction"] == [5, 30, 60, 80, 90, 95, 98, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 99, 100]

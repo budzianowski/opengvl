@@ -9,8 +9,15 @@ from abc import abstractmethod
 from typing import List
 
 import numpy as np
+
+# third-party imports
+import openai
 import torch
 import torchvision.transforms as T
+from data_loader import Episode
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from loguru import logger
 from PIL import Image
 from torchvision.transforms import InterpolationMode
@@ -25,24 +32,17 @@ from transformers import (
     BitsAndBytesConfig,
     Gemma3ForConditionalGeneration,
 )
-from dotenv import load_dotenv
-from data_loader import Episode
-
-# third-party imports
-import openai
-
-from google import genai
-from google.genai import types
 
 """Kimi Thinking multimodal client implementation."""
 from __future__ import annotations
 
 from typing import List
-from loguru import logger
+
 import torch
+from data_loader import Episode
+from loguru import logger
 from transformers import AutoModelForCausalLM, AutoProcessor
 
-from data_loader import Episode
 from .base import BaseModelClient
 
 
@@ -99,7 +99,9 @@ class KimiThinkingClient(BaseModelClient):
                 image_idx += 1
 
         prompt_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
-        inputs = self.processor(text=prompt_text, images=images, return_tensors="pt").to(self.model.device, dtype=torch.bfloat16)
+        inputs = self.processor(text=prompt_text, images=images, return_tensors="pt").to(
+            self.model.device, dtype=torch.bfloat16
+        )
 
         input_len = inputs["input_ids"].shape[-1]
         if input_len > 128_000:
@@ -107,7 +109,6 @@ class KimiThinkingClient(BaseModelClient):
         logger.info(f"Input length: {input_len}")
 
         generated_ids = self.model.generate(**inputs, max_new_tokens=min(self.max_new_tokens, 32768), temperature=0.8)
-        trimmed = [out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
+        trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         response = self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         return response
-

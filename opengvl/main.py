@@ -7,15 +7,16 @@ Run:
 import argparse
 import json
 import os
+import time
 from datetime import datetime
 
 import numpy as np
-from loguru import logger
-import time
 import utils
 from data_loader import DataLoader
-from models import ModelFactory
+from loguru import logger
 from result_evaluator import ResultEvaluator
+
+from models import ModelFactory
 
 
 def convert_numpy_types(obj):

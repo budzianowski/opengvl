@@ -1,5 +1,7 @@
 """Model clients for the different models."""
 
+from __future__ import annotations
+
 import base64
 import io
 import math
@@ -9,8 +11,15 @@ from abc import abstractmethod
 from typing import List
 
 import numpy as np
+
+# third-party imports
+import openai
 import torch
 import torchvision.transforms as T
+from data_loader import Episode
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from loguru import logger
 from PIL import Image
 from torchvision.transforms import InterpolationMode
@@ -25,23 +34,7 @@ from transformers import (
     BitsAndBytesConfig,
     Gemma3ForConditionalGeneration,
 )
-from dotenv import load_dotenv
-from data_loader import Episode
 
-# third-party imports
-import openai
-
-from google import genai
-from google.genai import types
-
-from __future__ import annotations
-
-from typing import List
-from loguru import logger
-import torch
-from transformers import AutoProcessor, Gemma3ForConditionalGeneration
-
-from data_loader import Episode
 from .base import BaseModelClient
 
 
@@ -72,26 +65,37 @@ class GemmaClient(BaseModelClient):
         ]
 
         for ctx_idx, ctx_episode in enumerate(context_episodes, 1):
-            messages[0]["content"].extend([
-                {"type": "text", "text": f"Example episode {ctx_idx}."},
-                {"type": "text", "text": f"Instruction: {ctx_episode.instruction}"},
-            ])
-            for i, (task_completion, frame) in enumerate(zip(ctx_episode.task_completion_predictions, ctx_episode.frames), 1):
-                messages[0]["content"].extend([
-                    {"type": "text", "text": f"Frame {i}:"},
-                    {"type": "image", "base64": self.to_pil(frame)},
-                    {"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}%"},
-                ])
+            messages[0]["content"].extend(
+                [
+                    {"type": "text", "text": f"Example episode {ctx_idx}."},
+                    {"type": "text", "text": f"Instruction: {ctx_episode.instruction}"},
+                ]
+            )
+            for i, (task_completion, frame) in enumerate(
+                zip(ctx_episode.task_completion_predictions, ctx_episode.frames), 1
+            ):
+                messages[0]["content"].extend(
+                    [
+                        {"type": "text", "text": f"Frame {i}:"},
+                        {"type": "image", "base64": self.to_pil(frame)},
+                        {"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}%"},
+                    ]
+                )
 
         messages[0]["content"].append(
-            {"type": "text", "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Task Completion: PERCENTAGE%"}
+            {
+                "type": "text",
+                "text": f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames. Format: Frame: NUMBER, Task Completion: PERCENTAGE%",
+            }
         )
 
         for i, frame in enumerate(eval_episode.frames, 1):
-            messages[0]["content"].extend([
-                {"type": "text", "text": f"Frame {i}:"},
-                {"type": "image", "base64": self.to_pil(frame)},
-            ])
+            messages[0]["content"].extend(
+                [
+                    {"type": "text", "text": f"Frame {i}:"},
+                    {"type": "image", "base64": self.to_pil(frame)},
+                ]
+            )
 
         inputs = self.processor.apply_chat_template(
             messages,
@@ -112,4 +116,3 @@ class GemmaClient(BaseModelClient):
 
         decoded = self.processor.decode(output, skip_special_tokens=True)
         return decoded
-
