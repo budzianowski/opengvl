@@ -43,7 +43,7 @@ def to_numpy(image: ImageT) -> ImageNumpy:
         if getattr(image, "is_cuda", False):
             image = image.cpu()
         return image.detach().numpy()
-    raise ImageEncodingError(f"Unsupported image type: {type(image)}")
+    raise ImageEncodingError(image_type=type(image))
 
 
 def to_pil(image: ImageT) -> ImagePIL:
@@ -71,9 +71,9 @@ def to_pil(image: ImageT) -> ImagePIL:
         elif np_img.shape[2] == 1:  # grayscale with channel dim
             pil = Image.fromarray(np_img.squeeze(axis=2), "L")
         else:  # alpha or >4 channels not supported for now
-            raise ImageEncodingError(f"Unsupported channel count: {np_img.shape[2]}")
+            raise ImageEncodingError(message=f"Unsupported channel count: {np_img.shape[2]}")
     else:
-        raise ImageEncodingError(f"Unsupported image shape: {np_img.shape}")
+        raise ImageEncodingError(image_shape=np_img.shape)
 
     return pil.resize((IMG_SIZE, IMG_SIZE))
 
@@ -91,7 +91,7 @@ def encode_image(image: ImageT) -> EncodedImage:
     try:
         pil_image = to_pil(image)
     except Exception as exc:
-        raise ImageEncodingError(f"Failed to prepare image: {exc}") from exc
+        raise ImageEncodingError(exc=exc) from exc
 
     buffer = io.BytesIO()
     pil_image.save(buffer, format="PNG")

@@ -8,7 +8,6 @@ downstream modules.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List
 
 from data_loader import Episode
 
@@ -26,7 +25,7 @@ class BaseModelClient(ABC):
         self,
         prompt: str,
         eval_episode: Episode,
-        context_episodes: List[Episode],
+        context_episodes: list[Episode],
     ) -> str:  # pragma: no cover - interface only
         """Generate a textual response for a given evaluation episode.
 

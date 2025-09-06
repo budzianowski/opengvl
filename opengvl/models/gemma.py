@@ -1,5 +1,3 @@
-"""Model clients for the different models."""
-
 from __future__ import annotations
 
 from typing import List
@@ -13,7 +11,8 @@ from transformers import (
     Gemma3ForConditionalGeneration,
 )
 
-from .base import BaseModelClient
+from opengvl.models.base import BaseModelClient
+from opengvl.utils.images import to_pil
 
 
 class GemmaClient(BaseModelClient):
@@ -36,7 +35,7 @@ class GemmaClient(BaseModelClient):
                 "content": [
                     {"type": "text", "text": prompt},
                     {"type": "text", "text": "Initial robot scene:"},
-                    {"type": "image", "image": self.to_pil(eval_episode.starting_frame)},
+                    {"type": "image", "image": to_pil(eval_episode.starting_frame)},
                     {"type": "text", "text": "In the initial robot scene, the task completion percentage is 0."},
                 ],
             }
@@ -55,7 +54,7 @@ class GemmaClient(BaseModelClient):
                 messages[0]["content"].extend(
                     [
                         {"type": "text", "text": f"Frame {i}:"},
-                        {"type": "image", "base64": self.to_pil(frame)},
+                        {"type": "image", "base64": to_pil(frame)},
                         {"type": "text", "text": f"Task Completion Percentage: {task_completion:.1f}%"},
                     ]
                 )
@@ -71,7 +70,7 @@ class GemmaClient(BaseModelClient):
             messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Frame {i}:"},
-                    {"type": "image", "base64": self.to_pil(frame)},
+                    {"type": "image", "base64": to_pil(frame)},
                 ]
             )
 
@@ -89,7 +88,7 @@ class GemmaClient(BaseModelClient):
         logger.info(f"Input length: {input_len}")
 
         with torch.inference_mode():
-            output = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens, do_sample=False)
+            output = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, do_sample=False)
             output = output[0][input_len:]
 
         decoded = self.processor.decode(output, skip_special_tokens=True)

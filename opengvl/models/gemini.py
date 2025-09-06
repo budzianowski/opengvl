@@ -1,5 +1,3 @@
-"""Model clients for the different models."""
-
 from __future__ import annotations
 
 import os
@@ -11,7 +9,7 @@ from google import genai
 from google.genai import types
 from loguru import logger
 
-from .base import BaseModelClient
+from opengvl.models.base import BaseModelClient
 
 
 class GeminiClient(BaseModelClient):

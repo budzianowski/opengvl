@@ -1,4 +1,4 @@
-"""Model clients for the different models."""
+from __future__ import annotations
 
 from typing import List
 
@@ -11,10 +11,9 @@ from transformers import (
     AutoProcessor,
 )
 
-"""Kimi Thinking multimodal client implementation."""
-from __future__ import annotations
-
 from opengvl.models.base import BaseModelClient
+from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
+from opengvl.utils.images import to_pil
 
 
 class KimiThinkingClient(BaseModelClient):
@@ -79,7 +78,7 @@ class KimiThinkingClient(BaseModelClient):
             raise ValueError(f"Input length {input_len} exceeds maximum allowed length of 128000 tokens.")
         logger.info(f"Input length: {input_len}")
 
-        generated_ids = self.model.generate(**inputs, max_new_tokens=min(self.max_new_tokens, 32768), temperature=0.8)
+        generated_ids = self.model.generate(**inputs, max_new_tokens=min(MAX_TOKENS_TO_GENERATE, 32768), temperature=0.8)
         trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         response = self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         return response
