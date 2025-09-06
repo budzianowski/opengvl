@@ -5,7 +5,7 @@
 # Virtual Environment folder created by Poetry
 # This should always be ignored!
 .venv/
-
+.env
 # Python caches and compiled files
 __pycache__/
 *.pyc
