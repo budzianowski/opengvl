@@ -6,7 +6,6 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image as PILImage
 
-
 # Concrete image container aliases
 ImagePIL: TypeAlias = PILImage.Image
 ImageNumpyU8: TypeAlias = npt.NDArray[np.uint8]
@@ -18,17 +17,15 @@ ImageNumpy: TypeAlias = ImageNumpyU8 | ImageNumpyF32 | ImageNumpyF64
 # Minimal torch-like tensor protocol (no hard torch dependency here)
 @runtime_checkable
 class TorchTensorLike(Protocol):
-    def detach(self) -> "TorchTensorLike":
-        ...
+    def detach(self) -> TorchTensorLike: ...
 
-    def numpy(self) -> npt.NDArray[Any]:
-        ...
+    def numpy(self) -> npt.NDArray[Any]: ...
 
     @property
     def is_cuda(self) -> bool:  # pragma: no cover - attribute presence only
         ...
 
-    def cpu(self) -> "TorchTensorLike":  # pragma: no cover - passthrough
+    def cpu(self) -> TorchTensorLike:  # pragma: no cover - passthrough
         ...
 
 
@@ -41,13 +38,13 @@ ImageT: TypeAlias = ImagePIL | ImageNumpy | ImageTorch
 EncodedImage: TypeAlias = str
 
 __all__ = [
-    "ImagePIL",
-    "ImageNumpyU8",
+    "EncodedImage",
+    "ImageNumpy",
     "ImageNumpyF32",
     "ImageNumpyF64",
-    "ImageNumpy",
-    "TorchTensorLike",
-    "ImageTorch",
+    "ImageNumpyU8",
+    "ImagePIL",
     "ImageT",
-    "EncodedImage",
+    "ImageTorch",
+    "TorchTensorLike",
 ]

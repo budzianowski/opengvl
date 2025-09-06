@@ -1,49 +1,20 @@
 """Model clients for the different models."""
 
-import base64
-import io
-import math
-import os
-import tempfile
-from abc import abstractmethod
 from typing import List
 
-import numpy as np
-
 # third-party imports
-import openai
 import torch
-import torchvision.transforms as T
 from data_loader import Episode
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 from loguru import logger
-from PIL import Image
-from torchvision.transforms import InterpolationMode
 from transformers import (
-    AutoConfig,
-    AutoModel,
     AutoModelForCausalLM,
-    AutoModelForImageTextToText,
-    AutoModelForVision2Seq,
     AutoProcessor,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    Gemma3ForConditionalGeneration,
 )
 
 """Kimi Thinking multimodal client implementation."""
 from __future__ import annotations
 
-from typing import List
-
-import torch
-from data_loader import Episode
-from loguru import logger
-from transformers import AutoModelForCausalLM, AutoProcessor
-
-from .base import BaseModelClient
+from opengvl.models.base import BaseModelClient
 
 
 class KimiThinkingClient(BaseModelClient):
@@ -67,14 +38,14 @@ class KimiThinkingClient(BaseModelClient):
     ) -> str:
         images = []
         prompt_parts = [prompt, "Initial robot scene:"]
-        images.append(self.to_pil(eval_episode.starting_frame))
+        images.append(to_pil(eval_episode.starting_frame))
         prompt_parts.append("In the initial robot scene, the task completion percentage is 0.")
 
         counter = 1
         for ctx_episode in context_episodes:
             for task_completion, frame in zip(ctx_episode.task_completion_predictions, ctx_episode.frames):
                 prompt_parts.append(f"Frame {counter}:")
-                images.append(self.to_pil(frame))
+                images.append(to_pil(frame))
                 prompt_parts.append(f"Task Completion Percentage: {task_completion:.1f}%")
                 counter += 1
 
@@ -86,7 +57,7 @@ class KimiThinkingClient(BaseModelClient):
 
         for frame in eval_episode.frames:
             prompt_parts.append(f"Frame {counter}:")
-            images.append(self.to_pil(frame))
+            images.append(to_pil(frame))
             counter += 1
 
         messages = [{"role": "user", "content": []}]

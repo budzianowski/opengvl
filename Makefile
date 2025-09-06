@@ -27,3 +27,7 @@ clean:
 	rm -rf __pycache__
 	rm -rf .pytest_cache
 	find . -name "*.pyc" -delete
+
+# Typing checking
+pyright:
+	uv run pyright opengvl

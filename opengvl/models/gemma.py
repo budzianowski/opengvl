@@ -2,36 +2,14 @@
 
 from __future__ import annotations
 
-import base64
-import io
-import math
-import os
-import tempfile
-from abc import abstractmethod
 from typing import List
 
-import numpy as np
-
 # third-party imports
-import openai
 import torch
-import torchvision.transforms as T
 from data_loader import Episode
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 from loguru import logger
-from PIL import Image
-from torchvision.transforms import InterpolationMode
 from transformers import (
-    AutoConfig,
-    AutoModel,
-    AutoModelForCausalLM,
-    AutoModelForImageTextToText,
-    AutoModelForVision2Seq,
     AutoProcessor,
-    AutoTokenizer,
-    BitsAndBytesConfig,
     Gemma3ForConditionalGeneration,
 )
 

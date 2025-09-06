@@ -9,7 +9,7 @@ import openai
 from data_loader import Episode
 from loguru import logger
 
-from .base import BaseModelClient
+from opengvl.models.base import BaseModelClient
 
 
 class OpenAIClient(BaseModelClient):

@@ -1,37 +1,15 @@
 """Model clients for the different models."""
 
-import base64
-import io
-import math
+from __future__ import annotations
+
 import os
-import tempfile
-from abc import abstractmethod
 from typing import List
 
-import numpy as np
-
 # third-party imports
-import openai
-import torch
-import torchvision.transforms as T
 from data_loader import Episode
-from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from loguru import logger
-from PIL import Image
-from torchvision.transforms import InterpolationMode
-from transformers import (
-    AutoConfig,
-    AutoModel,
-    AutoModelForCausalLM,
-    AutoModelForImageTextToText,
-    AutoModelForVision2Seq,
-    AutoProcessor,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    Gemma3ForConditionalGeneration,
-)
 
 from .base import BaseModelClient
 
@@ -42,7 +20,7 @@ class GeminiClient(BaseModelClient):
     def __init__(self, model_name: str = "gemini-2.5-flash-lite-preview-06-17"):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise EnvironmentError("GEMINI_API_KEY not set in environment")
+            raise OSError("GEMINI_API_KEY not set in environment")
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
         logger.info(f"Using Gemini model {self.model_name}")

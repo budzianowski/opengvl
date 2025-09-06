@@ -1,7 +1,4 @@
 """Data loader utilities"""
-
-from __future__ import annotations
-
 import argparse
 from dataclasses import dataclass
 

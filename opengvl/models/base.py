@@ -5,18 +5,12 @@ dependencies (transformers, torch, cloud SDKs) so importing it is cheap for all
 downstream modules.
 """
 
+from __future__ import annotations
 
-import base64
-import io
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any, List
+from typing import List
 
-import numpy as np
 from data_loader import Episode
-from PIL import Image
-from utils.constants import IMG_SIZE
-from utils.errors import ImageEncodingError
 
 
 class BaseModelClient(ABC):
