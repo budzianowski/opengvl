@@ -1,0 +1,99 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+
+%files
+    pyproject.toml /app/pyproject.toml
+    uv.lock /app/uv.lock
+    opengvl /app/opengvl
+    configs /app/configs
+    README.md /app/README.md
+
+%post
+    set -e
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        git \
+        build-essential \
+        cmake \
+        python3-dev \
+        pkg-config \
+        ffmpeg \
+        libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
+        libswscale-dev libswresample-dev libavfilter-dev \
+        ca-certificates \
+        curl
+
+    # Optional: CUDA toolkits and drivers are typically provided by the host with --nv;
+    # If you need CUDA libs in the image, uncomment the following and ensure versions match PyTorch wheels
+    # apt-get install -y --no-install-recommends nvidia-cuda-toolkit
+
+    # Install uv
+    pip install --no-cache-dir --upgrade pip uv
+
+    # Project layout already placed under /app via %files
+    cd /app
+
+    # Install project dependencies using the lockfile (creates /app/.venv)
+    # lerobot is installed from source per [tool.uv.sources] mapping in pyproject.toml
+    uv sync --frozen --no-dev
+
+    # Clean
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONPATH=/app:${PYTHONPATH}
+    export PATH=/app/.venv/bin:${PATH}
+    # Hugging Face and build caches (can be overridden at runtime)
+    export HF_HOME=/root/.cache/huggingface
+    export HF_DATASETS_CACHE=${HF_HOME}/datasets
+    export TRANSFORMERS_CACHE=${HF_HOME}/transformers
+    export PIP_CACHE_DIR=/root/.cache/pip
+    export UV_CACHE_DIR=/root/.cache/uv
+    export UV_LINK_MODE=copy
+
+%runscript
+    cd /app
+    exec /app/.venv/bin/python -m opengvl.main "$@"
+
+%help
+    This image is built with uv using the lock file.
+    - lerobot is installed from source via Git as configured in pyproject.toml
+    - ffmpeg and libav* dev packages are present for PyAV builds
+    
+        GPU:
+            Run with GPU (if host has NVIDIA):
+                apptainer run --nv opengvl.sif ...
+
+        Caches and environment (from project README):
+            You can speed up downloads/builds by persisting caches on the host and/or overriding env vars at runtime.
+            Common variables:
+                - HF_HOME               (default inside: /root/.cache/huggingface)
+                - UV_CACHE_DIR          (default inside: /root/.cache/uv)
+                - PIP_CACHE_DIR         (default inside: /root/.cache/pip)
+
+            Example with host caches (bind mounts):
+                apptainer run \
+                    -B /host/hf_cache:/root/.cache/huggingface \
+                    -B /host/uv_cache:/root/.cache/uv \
+                    -B /host/pip_cache:/root/.cache/pip \
+                    opengvl.sif --help
+
+            Or override env at runtime:
+                apptainer run --env HF_HOME=/data/hf_cache --env UV_CACHE_DIR=/data/uv_cache opengvl.sif ...
+
+        Build prerequisites:
+            - Ensure your uv.lock is up-to-date before building:
+                    uv lock
+            - Apptainer build:
+                    apptainer build opengvl.sif Apptainer.def
+
+        Notes:
+            - FFmpeg and libav dev packages are installed to satisfy PyAV build requirements used by LeRobot.
+            - On macOS (host only), if you encounter torch codec issues, you may need:
+                    export DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib
