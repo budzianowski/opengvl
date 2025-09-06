@@ -11,7 +11,7 @@ from transformers import (
     Gemma3ForConditionalGeneration,
 )
 
-from opengvl.models.base import BaseModelClient
+from opengvl.clients.base import BaseModelClient
 from opengvl.utils.images import to_pil
 
 

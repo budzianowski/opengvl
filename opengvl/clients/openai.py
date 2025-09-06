@@ -9,7 +9,7 @@ import openai
 from data_loader import Episode
 from loguru import logger
 
-from opengvl.models.base import BaseModelClient
+from opengvl.clients.base import BaseModelClient
 
 
 class OpenAIClient(BaseModelClient):
@@ -38,7 +38,7 @@ class OpenAIClient(BaseModelClient):
                 {"type": "input_text", "text": "Initial robot scene:"},
                 {
                     "type": "input_image",
-                    "image_url": f"data:image/png;base64,{self.encode_image(eval_episode.starting_frame)}",
+                    "image_url": f"data:image/png;base64,{encode_image(eval_episode.starting_frame)}",
                     "detail": self.detail,
                 },
                 {"type": "input_text", "text": "In the initial robot scene, the task completion percentage is 0."},
@@ -54,7 +54,7 @@ class OpenAIClient(BaseModelClient):
                         {"type": "input_text", "text": f"Frame {counter}:"},
                         {
                             "type": "input_image",
-                            "image_url": f"data:image/png;base64,{self.encode_image(frame)}",
+                            "image_url": f"data:image/png;base64,{encode_image(frame)}",
                             "detail": self.detail,
                         },
                         {"type": "input_text", "text": f"Task Completion Percentage: {task_completion:.1f}%"},
@@ -83,7 +83,7 @@ class OpenAIClient(BaseModelClient):
                     {"type": "input_text", "text": f"Frame {counter}:"},
                     {
                         "type": "input_image",
-                        "image_url": f"data:image/png;base64,{self.encode_image(frame)}",
+                        "image_url": f"data:image/png;base64,{encode_image(frame)}",
                         "detail": self.detail,
                     },
                 ]
