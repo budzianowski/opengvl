@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from data_loader import Episode
+from opengvl.data_loader import Episode
 
 
 class BaseModelClient(ABC):

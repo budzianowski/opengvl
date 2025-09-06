@@ -49,7 +49,7 @@ from PIL import Image
 from result_evaluator import ResultEvaluator
 from voc_score import VOCScorer
 
-from models import ModelFactory
+from opengvl.utils.modeling import ModelFactory
 
 
 class InferenceRunner:

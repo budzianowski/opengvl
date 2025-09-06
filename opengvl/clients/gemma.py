@@ -12,6 +12,7 @@ from transformers import (
 )
 
 from opengvl.clients.base import BaseModelClient
+from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
 from opengvl.utils.images import to_pil
 
 
