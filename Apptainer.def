@@ -69,31 +69,3 @@ From: python:3.11-slim
         GPU:
             Run with GPU (if host has NVIDIA):
                 apptainer run --nv opengvl.sif ...
-
-        Caches and environment (from project README):
-            You can speed up downloads/builds by persisting caches on the host and/or overriding env vars at runtime.
-            Common variables:
-                - HF_HOME               (default inside: /root/.cache/huggingface)
-                - UV_CACHE_DIR          (default inside: /root/.cache/uv)
-                - PIP_CACHE_DIR         (default inside: /root/.cache/pip)
-
-            Example with host caches (bind mounts):
-                apptainer run \
-                    -B /host/hf_cache:/root/.cache/huggingface \
-                    -B /host/uv_cache:/root/.cache/uv \
-                    -B /host/pip_cache:/root/.cache/pip \
-                    opengvl.sif --help
-
-            Or override env at runtime:
-                apptainer run --env HF_HOME=/data/hf_cache --env UV_CACHE_DIR=/data/uv_cache opengvl.sif ...
-
-        Build prerequisites:
-            - Ensure your uv.lock is up-to-date before building:
-                    uv lock
-            - Apptainer build:
-                    apptainer build opengvl.sif Apptainer.def
-
-        Notes:
-            - FFmpeg and libav dev packages are installed to satisfy PyAV build requirements used by LeRobot.
-            - On macOS (host only), if you encounter torch codec issues, you may need:
-                    export DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib
