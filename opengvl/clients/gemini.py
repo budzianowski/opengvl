@@ -6,10 +6,11 @@ from typing import List
 # third-party imports
 from data_loader import Episode
 from google import genai
-from google.genai import types
+from google.genai import typesfrom google.genai import types
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
+from opengvl.utils.images import encode_image
 
 
 class GeminiClient(BaseModelClient):

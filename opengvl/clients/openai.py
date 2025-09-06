@@ -10,6 +10,7 @@ from data_loader import Episode
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
+from opengvl.utils.images import encode_image
 
 
 class OpenAIClient(BaseModelClient):
