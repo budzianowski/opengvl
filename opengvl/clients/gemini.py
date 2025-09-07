@@ -42,7 +42,9 @@ class GeminiClient(BaseModelClient):
 
         counter = 1
         for ctx_episode in context_episodes:
-            for task_completion, frame in zip(ctx_episode.task_completion_predictions, ctx_episode.frames):
+            for task_completion, frame in zip(
+                ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames
+            ):
                 contents.append(f"Frame {counter}:")
                 contents.append(Part.from_bytes(data=encode_image(frame), mime_type="image/png"))
                 contents.append(f"Task Completion Percentage: {task_completion:.1f}%")
@@ -56,7 +58,7 @@ class GeminiClient(BaseModelClient):
         contents.append("Be rigorous and precise; percentage reflects task completion.")
         contents.append("Remember: frames are in random order.")
 
-        for frame in eval_episode.frames:
+        for frame in eval_episode.shuffled_frames:
             contents.append(f"Frame {counter}:")
             contents.append(Part.from_bytes(data=encode_image(frame), mime_type="image/png"))
             contents.append("")

@@ -47,7 +47,7 @@ class GemmaClient(BaseModelClient):
                 ]
             )
             for i, (task_completion, frame) in enumerate(
-                zip(ctx_episode.task_completion_predictions, ctx_episode.frames), 1
+                zip(ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames), 1
             ):
                 messages[0]["content"].extend(
                     [
@@ -64,7 +64,7 @@ class GemmaClient(BaseModelClient):
             }
         )
 
-        for i, frame in enumerate(eval_episode.frames, 1):
+        for i, frame in enumerate(eval_episode.shuffled_frames, 1):
             messages[0]["content"].extend(
                 [
                     {"type": "text", "text": f"Frame {i}:"},

@@ -4,6 +4,7 @@
 import base64
 import io
 
+from loguru import logger
 import numpy as np
 from PIL import Image
 

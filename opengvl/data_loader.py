@@ -1,32 +1,14 @@
 """Data loader utilities"""
 
-from dataclasses import dataclass
-
 import matplotlib.pyplot as plt
 import numpy as np
 from datasets.utils.logging import disable_progress_bar
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 from loguru import logger
 
+from opengvl.utils.data_types import Episode, Example
+
 disable_progress_bar()
-
-
-@dataclass
-class Episode:
-    instruction: str
-    starting_frame: np.ndarray
-    episode_index: int
-    original_frames_indices: list[int]
-    shuffled_frames_indices: list[int]
-    task_completion_predictions: list[int]
-    unshuffled_task_completion_predictions: list[int]
-    frames: list[np.ndarray]
-
-
-@dataclass
-class Example:
-    eval_episode: Episode
-    context_episodes: list[Episode]
 
 
 class DataLoader:
@@ -123,9 +105,9 @@ class DataLoader:
                 episode_index=episode_index,
                 original_frames_indices=context_frames_indices.tolist(),
                 shuffled_frames_indices=shuffled_indices.tolist(),
-                task_completion_predictions=shuffled_completion_prediction.tolist(),
-                unshuffled_task_completion_predictions=completion_prediction.tolist(),
-                frames=shuffled_frames,
+                shuffled_frames_approx_completion_rates=shuffled_completion_prediction.tolist(),
+                original_frames_task_completion_rates=completion_prediction.tolist(),
+                shuffled_frames=shuffled_frames,
             )
             episodes.append(episode)
         return episodes
@@ -195,11 +177,11 @@ class DataLoader:
                 return
             episode = example.context_episodes[episode_idx]
 
-        frames = episode.frames
+        frames = episode.shuffled_frames
         instruction = episode.instruction
         original_indices = episode.original_frames_indices
         shuffled_indices = episode.shuffled_frames_indices
-        completion_preds = episode.task_completion_predictions
+        completion_preds = episode.shuffled_frames_approx_completion_rates
 
         # Create figure with subplots for frames and completion graph
         num_frames = len(frames)

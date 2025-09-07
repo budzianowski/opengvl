@@ -48,7 +48,9 @@ class OpenAIClient(BaseModelClient):
         counter = 1
         # Context episodes
         for ctx_episode in context_episodes:
-            for task_completion, frame in zip(ctx_episode.task_completion_predictions, ctx_episode.frames):
+            for task_completion, frame in zip(
+                ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames
+            ):
                 content.extend(
                     [
                         {"type": "input_text", "text": f"Frame {counter}:"},
@@ -77,7 +79,7 @@ class OpenAIClient(BaseModelClient):
         content.append({"type": "input_text", "text": "Remember: frames are in random order."})
 
         # Evaluation frames
-        for frame in eval_episode.frames:
+        for frame in eval_episode.shuffled_frames:
             content.extend(
                 [
                     {"type": "input_text", "text": f"Frame {counter}:"},

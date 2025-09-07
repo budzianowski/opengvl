@@ -177,9 +177,9 @@ class InferenceRunner:
             episode_index=0,  # Use 0 for custom episodes
             original_frames_indices=original_indices,
             shuffled_frames_indices=shuffled_indices.tolist(),
-            task_completion_predictions=completion_predictions,
-            unshuffled_task_completion_predictions=completion_predictions,
-            frames=shuffled_frames,
+            shuffled_frames_approx_completion_rates=completion_predictions,
+            original_frames_task_completion_rates=completion_predictions,
+            shuffled_frames=shuffled_frames,
         )
 
         logger.info(f"Created episode with {len(frames)} frames")
@@ -259,7 +259,7 @@ class InferenceRunner:
 
             # Calculate VOC score if we have valid predictions
             voc_score = 0.0
-            if extracted_percentages and len(extracted_percentages) == len(episode.frames):
+            if extracted_percentages and len(extracted_percentages) == len(episode.shuffled_frames):
                 # Create a temporary record for VOC calculation
                 temp_record = {
                     "extracted_percentages": extracted_percentages,
@@ -282,10 +282,10 @@ class InferenceRunner:
                 "model_response": model_response,
                 "extracted_percentages": extracted_percentages,
                 "voc_score": voc_score,
-                "ground_truth_percentages": episode.task_completion_predictions,
+                "ground_truth_percentages": episode.shuffled_frames_approx_completion_rates,
                 "episode_info": {
                     "instruction": episode.instruction,
-                    "num_frames": len(episode.frames),
+                    "num_frames": len(episode.shuffled_frames),
                     "original_indices": episode.original_frames_indices,
                     "shuffled_indices": episode.shuffled_frames_indices,
                 },
@@ -298,10 +298,10 @@ class InferenceRunner:
                 "model_response": "",
                 "extracted_percentages": [],
                 "voc_score": 0.0,
-                "ground_truth_percentages": episode.task_completion_predictions,
+                "ground_truth_percentages": episode.shuffled_frames_approx_completion_rates,
                 "episode_info": {
                     "instruction": episode.instruction,
-                    "num_frames": len(episode.frames),
+                    "num_frames": len(episode.shuffled_frames),
                     "original_indices": episode.original_frames_indices,
                     "shuffled_indices": episode.shuffled_frames_indices,
                 },
@@ -322,7 +322,7 @@ class InferenceRunner:
         ground_truth_percentages = results.get("ground_truth_percentages", [])
         voc_score = results.get("voc_score", 0.0)
 
-        frames = episode.frames
+        frames = episode.shuffled_frames
         num_frames = len(frames)
         # Create figure with subplots for frames and graphs
         cols = min(4, num_frames)

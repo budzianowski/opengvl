@@ -38,7 +38,9 @@ class KimiThinkingClient(BaseModelClient):
 
         counter = 1
         for ctx_episode in context_episodes:
-            for task_completion, frame in zip(ctx_episode.task_completion_predictions, ctx_episode.frames):
+            for task_completion, frame in zip(
+                ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames
+            ):
                 prompt_parts.append(f"Frame {counter}:")
                 images.append(to_pil(frame))
                 prompt_parts.append(f"Task Completion Percentage: {task_completion:.1f}%")
@@ -50,7 +52,7 @@ class KimiThinkingClient(BaseModelClient):
         prompt_parts.append("Be rigorous and precise; percentage reflects task completion.")
         prompt_parts.append("Remember: frames are in random order.")
 
-        for frame in eval_episode.frames:
+        for frame in eval_episode.shuffled_frames:
             prompt_parts.append(f"Frame {counter}:")
             images.append(to_pil(frame))
             counter += 1
