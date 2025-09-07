@@ -1,6 +1,6 @@
 """Model clients package public API."""
 
-from __future__ import annotations
+
 
 from opengvl.clients.base import BaseModelClient
 from opengvl.clients.gemini import GeminiClient

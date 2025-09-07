@@ -5,7 +5,7 @@ dependencies (transformers, torch, cloud SDKs) so importing it is cheap for all
 downstream modules.
 """
 
-from __future__ import annotations
+
 
 from abc import ABC, abstractmethod
 
