@@ -11,7 +11,8 @@ from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
 from opengvl.utils.images import encode_image
-
+from dotenv import load_dotenv
+from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
 
 class OpenAIClient(BaseModelClient):
     """OpenAI client wrapping the Responses API for image+text prompting."""
@@ -95,6 +96,6 @@ class OpenAIClient(BaseModelClient):
         response = self.client.responses.create(
             model=self.model_id,
             input=messages,
-            max_output_tokens=self.max_new_tokens,
+            max_output_tokens=MAX_TOKENS_TO_GENERATE,
         )
         return response.output_text

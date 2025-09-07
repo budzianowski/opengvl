@@ -10,7 +10,7 @@ from transformers import (
     AutoProcessor,
     Gemma3ForConditionalGeneration,
 )
-
+from dotenv import load_dotenv
 from opengvl.clients.base import BaseModelClient
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
 from opengvl.utils.images import to_pil
@@ -23,6 +23,7 @@ class GemmaClient(BaseModelClient):
         logger.info(f"Loading Gemma model {model_id} ...")
         self.model = Gemma3ForConditionalGeneration.from_pretrained(model_id, device_map="auto").eval()
         self.processor = AutoProcessor.from_pretrained(model_id)
+        logger.info(type(self.processor))
 
     def generate_response(
         self,
@@ -94,3 +95,9 @@ class GemmaClient(BaseModelClient):
 
         decoded = self.processor.decode(output, skip_special_tokens=True)
         return decoded
+
+
+if __name__ == "__main__":
+    load_dotenv('./.env', override=True)
+    client = GemmaClient()
+    print(client)
