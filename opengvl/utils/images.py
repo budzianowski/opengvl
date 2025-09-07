@@ -1,11 +1,8 @@
-# Utils for image processing
-
-
 import base64
 import io
 
-from loguru import logger
 import numpy as np
+from loguru import logger
 from PIL import Image
 
 from opengvl.utils.aliases import EncodedImage, ImageNumpy, ImagePIL, ImageT, TorchTensorLike
@@ -22,8 +19,7 @@ def normalize_numpy(image: ImageNumpy) -> ImageNumpy:
         image = (image * 255).astype(np.uint8)
     else:
         logger.warning(
-            f'Image dtype is {image.dtype} with max {image.max()}. ' \
-            'Expected float in [0,1] or uint8. Leaving unchanged.'
+            f"Image dtype is {image.dtype} with max {image.max()}. Expected float in [0,1] or uint8. Leaving unchanged."
         )
     return image
 

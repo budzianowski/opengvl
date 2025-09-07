@@ -1,0 +1,12 @@
+# Local images data loader
+_target_: opengvl.data_loaders.local.LocalDataLoader
+
+# Pull from dataset group
+episodes_files: ${dataset.episodes_files}
+instruction: ${dataset.instruction}
+
+# Loader knobs (fallbacks if dataset does not specify)
+num_frames: ${dataset.num_frames:20}
+num_context_episodes: ${dataset.num_context_episodes:0}
+shuffle: ${shuffle}
+seed: ${seed}

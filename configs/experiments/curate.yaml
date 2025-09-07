@@ -1,0 +1,8 @@
+defaults:
+	- dataset: local_mock_small
+	- data_loader: local
+	- model: gemma
+
+# Global knobs
+seed: 123
+shuffle: true

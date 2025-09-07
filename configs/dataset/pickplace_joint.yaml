@@ -1,0 +1,7 @@
+# Pick and place joint dataset from inference examples
+name: pickplace_joint
+dataset_name: "willx0909/pickplace_joint"
+camera_index: 0
+max_episodes: 50
+num_frames: 15
+num_context_episodes: 1

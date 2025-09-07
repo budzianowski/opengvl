@@ -1,0 +1,11 @@
+# Hugging Face (LeRobot) data loader
+_target_: opengvl.data_loaders.huggingface.HuggingFaceDataLoader
+
+dataset_name: ${dataset.dataset_name}
+camera_index: ${dataset.camera_index:0}
+num_frames: ${dataset.num_frames:20}
+num_context_episodes: ${dataset.num_context_episodes:2}
+shuffle: ${shuffle}
+seed: ${seed}
+# Limit total episodes to iterate
+max_episodes: ${dataset.max_episodes:50}

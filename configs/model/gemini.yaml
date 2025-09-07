@@ -1,0 +1,3 @@
+# Google Gemini API client
+_target_: opengvl.clients.gemini.GeminiClient
+model_name: gemini-2.5-flash-lite-preview-06-17

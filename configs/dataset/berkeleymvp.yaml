@@ -1,0 +1,7 @@
+# Berkeley MVP dataset (placeholder)
+name: berkeleymvp
+dataset_name: "berkeley/mvp_dataset"  
+camera_index: 0
+max_episodes: 50
+num_frames: 15
+num_context_episodes: 2
