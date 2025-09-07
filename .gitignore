@@ -6,11 +6,12 @@
 # This should always be ignored!
 .venv/
 .env
-# Python caches and compiled files
+# Python caches and compiled files/images
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.sif
 
 # Distribution / packaging
 dist/

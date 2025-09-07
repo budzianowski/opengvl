@@ -12,7 +12,7 @@ from datetime import datetime
 
 import numpy as np
 import utils
-from data_loader import DataLoader
+from opengvl.data_loader import DataLoader
 from loguru import logger
 from result_evaluator import ResultEvaluator
 

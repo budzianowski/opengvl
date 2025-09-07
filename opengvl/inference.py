@@ -43,7 +43,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from data_loader import DataLoader, Episode, Example
+from opengvl.data_loader import DataLoader, Episode, Example
 from loguru import logger
 from PIL import Image
 from result_evaluator import ResultEvaluator

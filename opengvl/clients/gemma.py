@@ -4,7 +4,7 @@ from typing import List
 
 # third-party imports
 import torch
-from data_loader import Episode
+from opengvl.data_loader import Episode
 from loguru import logger
 from transformers import (
     AutoProcessor,

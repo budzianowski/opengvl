@@ -6,8 +6,8 @@ from typing import List
 from dotenv import load_dotenv
 
 # third-party imports
-from data_loader import Episode
-from google.generativeai.types import Part
+from opengvl.data_loader import Episode
+from google.genai.types import Part
 from google.genai.client import Client
 from loguru import logger
 

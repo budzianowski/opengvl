@@ -7,15 +7,15 @@ import io
 import numpy as np
 from PIL import Image
 
-from utils.aliases import (
+from opengvl.utils.aliases import (
     EncodedImage,
     ImageNumpy,
     ImagePIL,
     ImageT,
     TorchTensorLike,
 )
-from utils.constants import IMG_SIZE
-from utils.errors import ImageEncodingError
+from opengvl.utils.constants import IMG_SIZE
+from opengvl.utils.errors import ImageEncodingError
 
 
 def normalize_numpy(image: ImageNumpy) -> ImageNumpy:

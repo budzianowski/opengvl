@@ -6,7 +6,7 @@ import os
 from typing import List
 
 import openai
-from data_loader import Episode
+from opengvl.data_loader import Episode
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
