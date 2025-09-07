@@ -1,6 +1,5 @@
-# NYU Franka dataset (placeholder)
 name: nyufranka
-dataset_name: "nyu/franka_dataset"  
+dataset_name: "lerobot/nyu_franka_play_dataset"
 camera_index: 0
 max_episodes: 50
 num_frames: 15

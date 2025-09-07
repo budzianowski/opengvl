@@ -59,7 +59,6 @@ class VOCScorer:
                 preds = rec.get("extracted_percentages", [])
                 shuffled_indices = rec.get("eval_episode", {}).get("shuffled_frames_indices")
 
-
                 if not preds:
                     self.skipped_stats["empty_preds"] += 1
                     continue

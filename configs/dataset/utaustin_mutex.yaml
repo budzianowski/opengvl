@@ -1,5 +1,5 @@
-name: berkeleymvp
-dataset_name: "lerobot/berkeley_mvp"
+name: utaustin_mutex
+dataset_name: "lerobot/utaustin_mutex"
 camera_index: 0
 max_episodes: 50
 num_frames: 15

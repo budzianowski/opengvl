@@ -80,6 +80,7 @@ class InferredEpisode(Episode):
                 len(self.shuffled_frames_approx_completion_rates),
             )
 
+
 @dataclass
 class Example:
     eval_episode: Episode

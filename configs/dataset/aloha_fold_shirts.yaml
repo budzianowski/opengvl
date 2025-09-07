@@ -1,6 +1,5 @@
-# Aloha fold shirts dataset (from paper fig; verify exact repo name)
 name: aloha_fold_shirts
-dataset_name: "cking616/aloha_flod_shirts"  # NOTE: verify spelling of 'fold'
+dataset_name: "cking616/aloha_flod_shirts"
 camera_index: 0
 max_episodes: 50
 num_frames: 15

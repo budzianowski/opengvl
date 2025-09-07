@@ -1,6 +1,5 @@
-# CMU Stretch dataset (placeholder)
 name: cmustretch
-dataset_name: "cmu/stretch_dataset"  
+dataset_name: "lerobot/cmu_stretch"
 camera_index: 0
 max_episodes: 50
 num_frames: 15
