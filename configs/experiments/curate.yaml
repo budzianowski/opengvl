@@ -1,8 +1,8 @@
 # Compose dataset, data loader, and model; override any on the CLI.
 defaults:
-	- dataset: local_mock_small
-	- data_loader: local
-	- model: gemma
+  dataset: local_mock_small
+  data_loader: local
+  model: gemma
 
 # Global knobs
 seed: 123
