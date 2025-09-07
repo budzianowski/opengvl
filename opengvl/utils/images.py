@@ -19,6 +19,11 @@ def normalize_numpy(image: ImageNumpy) -> ImageNumpy:
     """
     if image.dtype in (np.float32, np.float64) and image.max() <= 1.0:
         image = (image * 255).astype(np.uint8)
+    else:
+        logger.warning(
+            f'Image dtype is {image.dtype} with max {image.max()}. ' \
+            'Expected float in [0,1] or uint8. Leaving unchanged.'
+        )
     return image
 
 
