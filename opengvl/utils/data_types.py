@@ -1,6 +1,11 @@
 from dataclasses import dataclass
 
 from opengvl.utils.aliases import ImageNumpy
+from opengvl.utils.errors import (
+    OriginalFramesLengthMismatch,
+    ShuffledFramesIndicesNotSubset,
+    ShuffledFramesLengthMismatch,
+)
 
 
 @dataclass
@@ -42,6 +47,38 @@ class Episode:
     original_frames_task_completion_rates: list[int]  # aligned 1:1 with original_frames_indices
     shuffled_frames: list[ImageNumpy]  # frames ordered per shuffled_frames_indices
 
+    def __post_init__(self):
+        if len(self.original_frames_indices) != len(self.original_frames_task_completion_rates):
+            raise OriginalFramesLengthMismatch(
+                len(self.original_frames_indices), len(self.original_frames_task_completion_rates)
+            )
+        if not (
+            len(self.shuffled_frames_indices)
+            == len(self.shuffled_frames)
+            == len(self.shuffled_frames_approx_completion_rates)
+        ):
+            raise ShuffledFramesLengthMismatch(
+                len(self.shuffled_frames_indices),
+                len(self.shuffled_frames),
+                len(self.shuffled_frames_approx_completion_rates),
+            )
+        # Optional: ensure shuffled indices are a subset of original indices
+        if not set(self.shuffled_frames_indices).issubset(set(self.original_frames_indices)):
+            raise ShuffledFramesIndicesNotSubset()
+
+
+@dataclass
+class InferredEpisode(Episode):
+    shuffled_frames_predicted_completion_rates: list[int]  # aligned 1:1 with shuffled_frames
+
+    def __post_init__(self):
+        super().__post_init__()
+        if len(self.shuffled_frames_predicted_completion_rates) != len(self.shuffled_frames):
+            raise ShuffledFramesLengthMismatch(
+                len(self.shuffled_frames_predicted_completion_rates),
+                len(self.shuffled_frames),
+                len(self.shuffled_frames_approx_completion_rates),
+            )
 
 @dataclass
 class Example:
