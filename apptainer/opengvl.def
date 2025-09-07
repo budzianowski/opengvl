@@ -49,7 +49,6 @@ From: python:3.11-slim
     export PYTHONDONTWRITEBYTECODE=1
     export PYTHONPATH=/app:${PYTHONPATH}
     export PATH=/app/.venv/bin:${PATH}
-    # Hugging Face and build caches (can be overridden at runtime)
     export HF_HOME=/root/.cache/huggingface
     export HF_DATASETS_CACHE=${HF_HOME}/datasets
     export TRANSFORMERS_CACHE=${HF_HOME}/transformers
@@ -57,9 +56,6 @@ From: python:3.11-slim
     export UV_CACHE_DIR=/root/.cache/uv
     export UV_LINK_MODE=copy
 
-%runscript
-    cd /app
-    exec /app/.venv/bin/python -m opengvl.main "$@"
 
 %help
     This image is built with uv using the lock file.
