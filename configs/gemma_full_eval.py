@@ -45,7 +45,7 @@ if __name__ == "__main__":
             config = CONFIG.copy()
             config["dataset"] = dataset
             config["model"] = model
-            config["output_dir"] = f"results/"
+            config["output_dir"] = "results/"
             config["experiment_name"] = f"{model}_{dataset}"
             logger.info(
                 f"Running evaluation on model: {config['model']} on dataset: {config['dataset']} with {config['num_context_episodes']} context episodes and {config['max_frames']} max frames on {config['num_eval_steps']} steps."

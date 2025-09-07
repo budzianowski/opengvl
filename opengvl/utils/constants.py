@@ -1,5 +1,3 @@
-
-
 from typing import Final
 
 IMG_SIZE: Final[int] = 244

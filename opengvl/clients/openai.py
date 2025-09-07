@@ -1,18 +1,16 @@
 """OpenAI multimodal client implementation."""
 
-
-
 import os
 from typing import List
 
 import openai
-from opengvl.data_loader import Episode
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
-from opengvl.utils.images import encode_image
-from dotenv import load_dotenv
+from opengvl.data_loader import Episode
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
+from opengvl.utils.images import encode_image
+
 
 class OpenAIClient(BaseModelClient):
     """OpenAI client wrapping the Responses API for image+text prompting."""
@@ -20,7 +18,7 @@ class OpenAIClient(BaseModelClient):
     def __init__(self, model_id: str = "gpt-4o-mini", detail: str = "high"):
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise EnvironmentError("OPENAI_API_KEY not set in environment")
+            raise OSError("OPENAI_API_KEY not set in environment")
         self.client = openai.OpenAI(api_key=api_key)
         self.model_id = model_id
         self.detail = detail

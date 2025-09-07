@@ -1,20 +1,16 @@
-
-
 from typing import List
 
 # third-party imports
 import torch
-from opengvl.data_loader import Episode
+from dotenv import load_dotenv
 from loguru import logger
-from transformers import (
-    AutoModelForCausalLM,
-    AutoProcessor,
-)
+from transformers import AutoModelForCausalLM, AutoProcessor
 
 from opengvl.clients.base import BaseModelClient
+from opengvl.data_loader import Episode
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
 from opengvl.utils.images import to_pil
-from dotenv import load_dotenv
+
 
 class KimiThinkingClient(BaseModelClient):
     """Client for Kimi Thinking VL model."""
@@ -78,12 +74,15 @@ class KimiThinkingClient(BaseModelClient):
             raise ValueError(f"Input length {input_len} exceeds maximum allowed length of 128000 tokens.")
         logger.info(f"Input length: {input_len}")
 
-        generated_ids = self.model.generate(**inputs, max_new_tokens=min(MAX_TOKENS_TO_GENERATE, 32768), temperature=0.8)
+        generated_ids = self.model.generate(
+            **inputs, max_new_tokens=min(MAX_TOKENS_TO_GENERATE, 32768), temperature=0.8
+        )
         trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         response = self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         return response
 
+
 if __name__ == "__main__":
-    load_dotenv('./.env', override=True)
+    load_dotenv("./.env", override=True)
     client = KimiThinkingClient()
     print(client)

@@ -1,7 +1,5 @@
 """Model clients package public API."""
 
-
-
 from opengvl.clients.base import BaseModelClient
 from opengvl.clients.gemini import GeminiClient
 from opengvl.clients.gemma import GemmaClient

@@ -407,7 +407,7 @@ def main():
 
     df = pd.DataFrame(df_data)
     df.to_csv("lerobot_accumulation_data.csv", index=False)
-    print(f"\nData saved to: lerobot_accumulation_data.csv")
+    print("\nData saved to: lerobot_accumulation_data.csv")
 
 
 if __name__ == "__main__":

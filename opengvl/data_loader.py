@@ -1,5 +1,5 @@
 """Data loader utilities"""
-import argparse
+
 from dataclasses import dataclass
 
 import matplotlib.pyplot as plt

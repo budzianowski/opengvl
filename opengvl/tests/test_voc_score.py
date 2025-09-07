@@ -1,8 +1,7 @@
-
-
 import numpy as np
 import pytest
-from voc_score import value_order_correlation
+
+from opengvl.voc_score import value_order_correlation
 
 
 class TestValueOrderCorrelation:

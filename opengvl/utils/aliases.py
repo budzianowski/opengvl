@@ -1,5 +1,3 @@
-
-
 from typing import Any, Protocol, TypeAlias, runtime_checkable
 
 import numpy as np
@@ -17,15 +15,15 @@ ImageNumpy: TypeAlias = ImageNumpyU8 | ImageNumpyF32 | ImageNumpyF64
 # Minimal torch-like tensor protocol (no hard torch dependency here)
 @runtime_checkable
 class TorchTensorLike(Protocol):
-    def detach(self) -> TorchTensorLike: ...
+    def detach(self) -> 'TorchTensorLike': ...
 
     def numpy(self) -> npt.NDArray[Any]: ...
 
     @property
-    def is_cuda(self) -> bool:  # pragma: no cover - attribute presence only
+    def is_cuda(self) -> bool:
         ...
 
-    def cpu(self) -> TorchTensorLike:  # pragma: no cover - passthrough
+    def cpu(self) -> 'TorchTensorLike': 
         ...
 
 

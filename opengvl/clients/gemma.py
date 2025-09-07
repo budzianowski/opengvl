@@ -1,17 +1,13 @@
-
-
 from typing import List
 
 # third-party imports
 import torch
-from opengvl.data_loader import Episode
-from loguru import logger
-from transformers import (
-    AutoProcessor,
-    Gemma3ForConditionalGeneration,
-)
 from dotenv import load_dotenv
+from loguru import logger
+from transformers import AutoProcessor, Gemma3ForConditionalGeneration
+
 from opengvl.clients.base import BaseModelClient
+from opengvl.data_loader import Episode
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
 from opengvl.utils.images import to_pil
 
@@ -98,6 +94,6 @@ class GemmaClient(BaseModelClient):
 
 
 if __name__ == "__main__":
-    load_dotenv('./.env', override=True)
+    load_dotenv("./.env", override=True)
     client = GemmaClient()
     print(client)

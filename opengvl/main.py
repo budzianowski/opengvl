@@ -12,11 +12,11 @@ from datetime import datetime
 
 import numpy as np
 import utils
-from opengvl.data_loader import DataLoader
 from loguru import logger
+from models import ModelFactory
 from result_evaluator import ResultEvaluator
 
-from models import ModelFactory
+from opengvl.data_loader import DataLoader
 
 
 def convert_numpy_types(obj):
@@ -164,7 +164,7 @@ class ResultCollector:
         """Load existing results from JSONL file if it exists"""
         logger.info(f"Loading existing results from {self.results_file}...")
         if os.path.exists(self.results_file):
-            with open(self.results_file, "r") as f:
+            with open(self.results_file) as f:
                 for line in f:
                     if line.strip():
                         self.results.append(json.loads(line))
@@ -249,7 +249,7 @@ def run_eval(
         try:
 
             prompt = utils.get_prompt(example.eval_episode.instruction)
-            logger.info(f"Waiting for model response ...")
+            logger.info("Waiting for model response ...")
             generating_start = datetime.now()
             response = client.generate_response(
                 prompt=prompt,
@@ -296,7 +296,7 @@ if __name__ == "__main__":
     logger.info(f"Current working directory: {os.getcwd()}")
 
     try:
-        with open(args.config_path, "r") as f:
+        with open(args.config_path) as f:
             config = json.load(f)
     except Exception as e:
         logger.error(f"Failed to load config file {args.config_path}: {e}")

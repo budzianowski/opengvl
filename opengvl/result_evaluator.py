@@ -103,7 +103,7 @@ Answer:
                 is_valid_length = len(prediction) == self.expected_length
                 return {"prediction": prediction, "length_is_valid": is_valid_length}
 
-            except Exception as e:
+            except (json.JSONDecodeError, Exception) as e:
                 print(f"Error during API call: {e}")
                 if attempt < retries - 1:
                     print("Retrying...")

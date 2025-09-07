@@ -1,17 +1,15 @@
-
-
 import os
 from typing import List
 
 from dotenv import load_dotenv
-
-# third-party imports
-from opengvl.data_loader import Episode
-from google.genai.types import Part
 from google.genai.client import Client
+from google.genai.types import Part
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
+
+# third-party imports
+from opengvl.data_loader import Episode
 from opengvl.utils.images import encode_image
 
 
@@ -69,6 +67,6 @@ class GeminiClient(BaseModelClient):
 
 
 if __name__ == "__main__":
-    load_dotenv('./.env', override=True)
+    load_dotenv("./.env", override=True)
     client = GeminiClient()
     print(client)

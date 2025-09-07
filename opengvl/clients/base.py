@@ -5,8 +5,6 @@ dependencies (transformers, torch, cloud SDKs) so importing it is cheap for all
 downstream modules.
 """
 
-
-
 from abc import ABC, abstractmethod
 
 from opengvl.data_loader import Episode

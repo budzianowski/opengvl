@@ -43,12 +43,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from opengvl.data_loader import DataLoader, Episode, Example
 from loguru import logger
 from PIL import Image
 from result_evaluator import ResultEvaluator
 from voc_score import VOCScorer
 
+from opengvl.data_loader import DataLoader, Episode, Example
 from opengvl.utils.modeling import ModelFactory
 
 
@@ -489,7 +489,7 @@ class InferenceRunner:
         with open(output_path, "w") as f:
             json.dump(results_clean, f, indent=2)
 
-        logger.info(f"Results saved successfully")
+        logger.info("Results saved successfully")
 
 
 def main():
@@ -581,7 +581,7 @@ def main():
     if "error" in results:
         logger.error(f"Inference failed: {results['error']}")
     else:
-        logger.info(f"Inference completed successfully!")
+        logger.info("Inference completed successfully!")
         logger.info(f"VOC Score: {results['voc_score']:.3f}")
         logger.info(f"Extracted {len(results['extracted_percentages'])} predictions")
 

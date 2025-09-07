@@ -59,7 +59,6 @@ class VOCScorer:
                 preds = rec.get("extracted_percentages", [])
                 shuffled_indices = rec.get("eval_episode", {}).get("shuffled_frames_indices")
 
-                print(preds)
 
                 if not preds:
                     self.skipped_stats["empty_preds"] += 1
@@ -105,7 +104,7 @@ class VOCScorer:
         }
         return stats
 
-    def plot_histogram(self, title: str = f"Distribution of VOC Scores", save_path: str | None = None):
+    def plot_histogram(self, title: str = "Distribution of VOC Scores", save_path: str | None = None):
         """
         Generates and displays a histogram of the VOC scores.
 
