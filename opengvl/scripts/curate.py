@@ -22,6 +22,7 @@ def main(config: DictConfig) -> None:
     ensure_required_keys(config, "dataset")
     ensure_required_keys(config, "data_loader")
     ensure_required_keys(config, "model")
+    ensure_required_keys(config, "prompts")
 
     # hydra instantiation
     data_loader: BaseDataLoader = instantiate(config.data_loader)
