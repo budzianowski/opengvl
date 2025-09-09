@@ -27,6 +27,7 @@ from opengvl.metrics.voc import VOCMetric
 from opengvl.results.prediction import PredictionRecord, aggregate_metrics
 from opengvl.utils import inference as infer_utils
 from opengvl.utils.data_types import Example as FewShotInput
+from opengvl.utils.data_types import InferredFewShotResult
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
 
@@ -64,25 +65,30 @@ def predict_on_fewshot_input(
         logger.error(f"Model generation failed for example {idx}: {e}")
         predicted: list[int] = []
         response_text = f"<error: {e}>"
-    else:
-        expected_len = len(ex.eval_episode.shuffled_frames)
-        predicted = infer_utils.extract_percentages(response_text, expected=expected_len)
-        if not predicted:
-            logger.warning(f"No percentages extracted for example {idx}")
-        elif len(predicted) != expected_len:
-            logger.warning(f"Length mismatch example {idx}: predicted={len(predicted)} expected={expected_len}")
-        else:
-            logger.success(f"Extracted {len(predicted)} percentages (expected) for example {idx}")
-        logger.debug(f"Predictions: {predicted}")
-        if save_raw:
-            logger.debug(f"Raw response length: {len(response_text)} chars")
+    logger.debug(f"Response {response_text}")
 
-    inferred = infer_utils.build_inferred_example(ex, predicted)
+    expected_len = len(ex.eval_episode.shuffled_frames)
+    predicted = infer_utils.extract_percentages(response_text, expected=expected_len)
+
+    logger.debug(f"Extracted percentages: {predicted}")
+    if not predicted:
+        logger.warning(f"No percentages extracted for example {idx}")
+    elif len(predicted) != expected_len:
+        logger.warning(f"Length mismatch example {idx}: predicted={len(predicted)} expected={expected_len}")
+    else:
+        logger.success(f"Extracted {len(predicted)} percentages (expected) for example {idx}")
+    logger.debug(f"Predictions: {predicted}")
+    if save_raw:
+        logger.debug(f"Raw response length: {len(response_text)} chars")
+
+    inferred: InferredFewShotResult = infer_utils.build_inferred_example(ex, predicted)
     metric_res = voc_metric.compute(inferred)
     metrics_payload = {metric_res.name: metric_res.value}
+
     if metric_res.details:
         for k, v in metric_res.details.items():
             metrics_payload[f"{metric_res.name}_{k}"] = v
+
     logger.debug(
         f"Metrics example {idx}: {metric_res.name}="
         f"{(metric_res.value if metric_res.value is not None else float('nan')):.4f}"

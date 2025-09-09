@@ -6,26 +6,52 @@ from pathlib import Path
 from opengvl.utils.data_types import Example as FewShotInput
 from opengvl.utils.data_types import InferredEpisode, InferredFewShotResult
 
-PERCENT_RE = re.compile(r"(\d{1,3})%")
+PERCENT_FLOAT_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*%")
 
 
-def extract_percentages(text: str, expected: int | None = None) -> list[int]:
-    """Extract integer percentages (0-100) in order of appearance.
+def extract_percentages(
+    text: str,
+    expected: int | None = None,
+    *,
+    as_int: bool = True,
+    round_mode: str = "nearest",
+) -> list[int] | list[float]:
+    """Extract percentages in order of appearance.
 
-    If expected is set and we collect more than expected, we truncate; if fewer
-    we return what we found (validation done later).
+    Args:
+        text: Source text.
+        expected: If provided, truncates once this many values collected.
+        as_int: Return integers (default) or raw floats.
+        round_mode: One of {nearest, floor, ceil} when converting to int.
+    Returns:
+        List of percentages (ints or floats) within [0,100].
     """
-    vals: list[int] = []
-    for m in PERCENT_RE.finditer(text):
+    vals: list[float] = []
+    for match in PERCENT_FLOAT_RE.finditer(text):
         try:
-            v = int(m.group(1))
+            v = float(match.group(1))
         except ValueError:
             continue
-        if 0 <= v <= 100:
-            vals.append(v)
+        if not (0.0 <= v <= 100.0):
+            continue
+        vals.append(v)
         if expected is not None and len(vals) >= expected:
             break
-    return vals
+
+    if not as_int:
+        return vals
+
+    if round_mode == "nearest":
+        conv = [round(v) for v in vals]
+    elif round_mode == "floor":
+        conv = [int(v // 1) for v in vals]
+    elif round_mode == "ceil":
+        import math
+
+        conv = [math.ceil(v) for v in vals]
+    else:  # fallback
+        conv = [round(v) for v in vals]
+    return [int(c) for c in conv]
 
 
 def build_inferred_example(

@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import Final, List
 
 from dotenv import load_dotenv
 from google.genai.client import Client
@@ -11,6 +11,8 @@ from opengvl.clients.base import BaseModelClient
 # third-party imports
 from opengvl.data_loader import Episode
 from opengvl.utils.images import encode_image
+
+BARE_MIN_LEN_TO_DISPLAY: Final[int] = len("Frame XX:  ")
 
 
 class GeminiClient(BaseModelClient):
@@ -64,7 +66,15 @@ class GeminiClient(BaseModelClient):
             contents.append("")
             counter += 1
 
+        logger.debug(f"Contents length: {len(contents)} parts")
+        # prefixes of them
+        for i, c in enumerate(contents):
+            if isinstance(c, str) and len(c) > BARE_MIN_LEN_TO_DISPLAY:
+                logger.debug(f"Contents part {i}: text (truncated 100 chars):\n{c[:100]}")
+
         response = self.client.models.generate_content(model=self.model_name, contents=contents)
+        if response.text is None:
+            raise RuntimeError("No text response from Gemini model")
         return response.text
 
 

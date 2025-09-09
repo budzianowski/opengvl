@@ -27,7 +27,7 @@ shuffle: true       # Whether to shuffle frame presentation order
 
 # Prediction runtime parameters (extend as needed) ---------------------------
 prediction:
-  num_examples: 3   # How many FewShotInput predictions to perform
+  num_examples: 1   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
   output_dir: ${hydra:run.dir}/predictions
 
