@@ -7,7 +7,7 @@ from scipy.stats import spearmanr
 from scipy.stats._stats_py import SignificanceResult
 
 from opengvl.metrics.base import Metric, MetricResult
-from opengvl.utils.data_types import InferredExample
+from opengvl.utils.data_types import InferredFewShotResult
 
 
 @dataclass
@@ -20,7 +20,7 @@ class VOCMetric(Metric):
     def name(self) -> str:
         return "voc"
 
-    def compute(self, example: InferredExample) -> MetricResult:
+    def compute(self, example: InferredFewShotResult) -> MetricResult:
         eval_ep = example.eval_episode
         preds = np.array(eval_ep.shuffled_frames_predicted_completion_rates, dtype=float)
         # reorder predictions into chronological order by sorting shuffled indices

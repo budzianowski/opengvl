@@ -13,82 +13,27 @@ Steps:
 """
 
 import json
-import re
-from collections.abc import Iterable
 from pathlib import Path
 
 import hydra
 from dotenv import load_dotenv
 from hydra.utils import instantiate
 from loguru import logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from opengvl.clients.base import BaseModelClient
 from opengvl.data_loaders.base import BaseDataLoader
 from opengvl.metrics.voc import VOCMetric
 from opengvl.results.prediction import PredictionRecord, aggregate_metrics
+from opengvl.utils import inference as infer_utils
 from opengvl.utils.data_types import Example as FewShotInput
-from opengvl.utils.data_types import InferredEpisode, InferredExample
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
-
-# ------------------------------- helpers ------------------------------------
-
-PERCENT_RE = re.compile(r"(\d{1,3})%")
-
-
-def extract_percentages(text: str, expected: int | None = None) -> list[int]:
-    """Extract integer percentages (0-100) in order of appearance.
-
-    If expected is set and we collect more than expected, we truncate; if fewer
-    we return what we found (validation done later).
-    """
-    vals: list[int] = []
-    for m in PERCENT_RE.finditer(text):
-        try:
-            v = int(m.group(1))
-        except ValueError:
-            continue
-        if 0 <= v <= 100:
-            vals.append(v)
-        if expected is not None and len(vals) >= expected:
-            break
-    return vals
-
-
-def build_inferred_example(
-    fewshot: FewShotInput,
-    predicted: list[int],
-) -> InferredExample:
-    eval_ep = fewshot.eval_episode
-    inferred_ep = InferredEpisode(
-        instruction=eval_ep.instruction,
-        starting_frame=eval_ep.starting_frame,
-        episode_index=eval_ep.episode_index,
-        original_frames_indices=eval_ep.original_frames_indices,
-        shuffled_frames_indices=eval_ep.shuffled_frames_indices,
-        shuffled_frames_approx_completion_rates=eval_ep.shuffled_frames_approx_completion_rates,
-        original_frames_task_completion_rates=eval_ep.original_frames_task_completion_rates,
-        shuffled_frames=eval_ep.shuffled_frames,
-        shuffled_frames_predicted_completion_rates=predicted,
-    )
-    return InferredExample(eval_episode=inferred_ep, context_episodes=fewshot.context_episodes)
-
-
-def save_jsonl(records: Iterable[dict], path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        for rec in records:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
-
-# ------------------------------- main logic ---------------------------------
 
 
 def _validate_config(config: DictConfig) -> None:
     for key in ("dataset", "data_loader", "model", "prompts", "prediction"):
         ensure_required_keys(config, key)
-    logger.debug("Config keys validated: %s", ["dataset", "data_loader", "model", "prompts", "prediction"])
 
 
 def _load_examples(loader: BaseDataLoader, n: int, dataset_name: str) -> list[FewShotInput]:
@@ -98,7 +43,7 @@ def _load_examples(loader: BaseDataLoader, n: int, dataset_name: str) -> list[Fe
     return examples
 
 
-def _process_example(
+def predict_on_fewshot_input(
     idx: int,
     total: int,
     ex: FewShotInput,
@@ -121,7 +66,7 @@ def _process_example(
         response_text = f"<error: {e}>"
     else:
         expected_len = len(ex.eval_episode.shuffled_frames)
-        predicted = extract_percentages(response_text, expected=expected_len)
+        predicted = infer_utils.extract_percentages(response_text, expected=expected_len)
         if not predicted:
             logger.warning(f"No percentages extracted for example {idx}")
         elif len(predicted) != expected_len:
@@ -132,7 +77,7 @@ def _process_example(
         if save_raw:
             logger.debug(f"Raw response length: {len(response_text)} chars")
 
-    inferred = build_inferred_example(ex, predicted)
+    inferred = infer_utils.build_inferred_example(ex, predicted)
     metric_res = voc_metric.compute(inferred)
     metrics_payload = {metric_res.name: metric_res.value}
     if metric_res.details:
@@ -158,9 +103,11 @@ def _process_example(
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="experiments/predict")
 def main(config: DictConfig) -> None:
+    """Main prediction script entry point."""
     _validate_config(config)
     load_dotenv(override=True)
     logger.info("Environment variables loaded (dotenv)")
+    logger.info(f"Configuration:\n{OmegaConf.to_yaml(config)}")
 
     data_loader: BaseDataLoader = instantiate(config.data_loader)
     client: BaseModelClient = instantiate(config.model)
@@ -181,13 +128,15 @@ def main(config: DictConfig) -> None:
     logger.debug(f"Metrics initialized: {voc_metric.name}")
 
     records = [
-        _process_example(idx, num_examples, ex, client, prompt_template, save_raw, voc_metric, config.dataset.name)
+        predict_on_fewshot_input(
+            idx, num_examples, ex, client, prompt_template, save_raw, voc_metric, config.dataset.name
+        )
         for idx, ex in enumerate(examples)
     ]
 
     logger.info(f"Serializing {len(records)} prediction records to {jsonl_path}")
     jsonl_payload_iter = (r.to_dict(include_images=False) for r in records)
-    save_jsonl(jsonl_payload_iter, jsonl_path)
+    infer_utils.save_jsonl(jsonl_payload_iter, jsonl_path)
     dataset_metrics = aggregate_metrics(records)
     logger.success(
         f"Aggregate metrics: total={dataset_metrics.total_examples} valid={dataset_metrics.valid_predictions} "

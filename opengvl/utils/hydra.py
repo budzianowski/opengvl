@@ -4,7 +4,7 @@ from omegaconf import DictConfig, OmegaConf
 HYDRA_TARGET_KEY = "_target_"
 
 
-def ensure_required_keys(cfg: DictConfig, base: str) -> None:
+def ensure_required_keys(cfg: DictConfig, *required_keys: str) -> None:
     """Validate that cfg contains all required keys under a given base path.
 
     Example:
@@ -12,7 +12,8 @@ def ensure_required_keys(cfg: DictConfig, base: str) -> None:
 
     Raises KeyError with a helpful message when a key is missing.
     """
-    node = OmegaConf.select(cfg, base)
-    if node is None:
-        raise KeyError(base)
-    logger.info(f'Validating config: key "{base}" is present.')
+    for key in required_keys:
+        node = OmegaConf.select(cfg, key)
+        if node is None:
+            raise KeyError(key)
+    logger.info(f'Validating config: keys "{", ".join(required_keys)}" are present.')

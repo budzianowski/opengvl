@@ -6,10 +6,11 @@
 #   - data_loader: implementation (HuggingFace LeRobot)
 #   - model: LLM / VLM client
 #   - prompts: prompt template (rigorous for structured outputs)
-#
+# Default values are executed with:
+#   HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict
 # Override examples:
-#   python -m opengvl.scripts.predict dataset=nyudoor model=openai prompts=concise
-#   python -m opengvl.scripts.predict dataset=nyudoor data_loader.huggingface.num_frames=30
+#   HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict dataset=nyudoor model=openai prompts=concise
+#   HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict dataset=nyudoor data_loader.huggingface.num_frames=30
 ###############################################################################
 
 defaults:
@@ -26,7 +27,7 @@ shuffle: true       # Whether to shuffle frame presentation order
 
 # Prediction runtime parameters (extend as needed) ---------------------------
 prediction:
-  num_examples: 5   # How many FewShotInput predictions to perform
+  num_examples: 3   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
   output_dir: ${hydra:run.dir}/predictions
 

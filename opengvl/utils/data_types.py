@@ -12,7 +12,7 @@ from opengvl.utils.errors import (
 class Episode:
     """
     Container for a single episode (or a selected subsequence of it) used in
-    evaluation/training.
+    evaluation/in context learning.
 
     Attributes
     - instruction: Natural-language description of the task to complete.
@@ -85,6 +85,21 @@ class InferredEpisode(Episode):
                 len(self.shuffled_frames_approx_completion_rates),
             )
 
+    @classmethod
+    def from_predictions(cls, episode: Episode, predictions: list[int]) -> "InferredEpisode":
+        """Simple factory method to create an InferredEpisode from an Episode and predictions."""
+        return cls(
+            instruction=episode.instruction,
+            starting_frame=episode.starting_frame,
+            episode_index=episode.episode_index,
+            original_frames_indices=episode.original_frames_indices,
+            shuffled_frames_indices=episode.shuffled_frames_indices,
+            shuffled_frames_approx_completion_rates=episode.shuffled_frames_approx_completion_rates,
+            original_frames_task_completion_rates=episode.original_frames_task_completion_rates,
+            shuffled_frames=episode.shuffled_frames,
+            shuffled_frames_predicted_completion_rates=predictions,
+        )
+
 
 @dataclass
 class Example:
@@ -92,14 +107,17 @@ class Example:
     Container for a single training/evaluation example consisting of one
     evaluation episode and multiple context episodes.
     """
+
     eval_episode: Episode
     context_episodes: list[Episode]
 
+
 @dataclass
-class InferredExample:
+class InferredFewShotResult:
     """
     Container for a single evaluation example consisting of one
     evaluation episode and multiple context episodes, with model predictions.
     """
+
     eval_episode: InferredEpisode
     context_episodes: list[Episode]
