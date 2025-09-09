@@ -43,8 +43,8 @@ class BaseDataLoader(ABC):
         return [self.load_fewshot_input() for _ in range(int(n))]
 
     def reset(self) -> None:
-        """Optional: reset internal iteration state."""
-        logger.debug("BaseDataLoader.reset() noop")
+        logger.info(f"Resetting {self.__class__.__name__} data loader with seed {self.seed}")
+        self._rng = np.random.default_rng(self.seed)
 
     # ---------------------------- helpers ---------------------------------
     def _linear_completion(self, length: int) -> list[int]:

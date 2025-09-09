@@ -1,0 +1,40 @@
+###############################################################################
+# Predict experiment configuration
+#
+# This Hydra config composes:
+#   - dataset: dataset metadata & frame sampling parameters
+#   - data_loader: implementation (HuggingFace LeRobot)
+#   - model: LLM / VLM client
+#   - prompts: prompt template (rigorous for structured outputs)
+#
+# Override examples:
+#   python -m opengvl.scripts.predict dataset=nyudoor model=openai prompts=concise
+#   python -m opengvl.scripts.predict dataset=nyudoor data_loader.huggingface.num_frames=30
+###############################################################################
+
+defaults:
+  # Order matters. _self_ keeps local keys (seed/shuffle) from being overridden.
+  - dataset: nyudoor
+  - data_loader: huggingface
+  - model: gemini
+  - prompts: rigorous
+  - _self_
+
+# Global experiment controls --------------------------------------------------
+seed: 2137          # Global seed (propagated to loader & any RNG-dependent logic)
+shuffle: true       # Whether to shuffle frame presentation order
+
+# Prediction runtime parameters (extend as needed) ---------------------------
+prediction:
+  num_examples: 5   # How many FewShotInput predictions to perform
+  save_raw: true    # Whether to dump raw model outputs
+  output_dir: ${hydra:run.dir}/predictions
+
+# Hydra output directory naming pattern --------------------------------------
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-predict
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-predict
+    subdir: ${hydra.job.num}
+

@@ -69,6 +69,11 @@ class Episode:
 
 @dataclass
 class InferredEpisode(Episode):
+    """
+    Extension of Episode that includes model-predicted completion rates for
+    the shuffled frames.
+    """
+
     shuffled_frames_predicted_completion_rates: list[int]  # aligned 1:1 with shuffled_frames
 
     def __post_init__(self):
@@ -83,5 +88,9 @@ class InferredEpisode(Episode):
 
 @dataclass
 class Example:
+    """
+    Container for a single training/evaluation example consisting of one
+    evaluation episode and multiple context episodes.
+    """
     eval_episode: Episode
     context_episodes: list[Episode]
