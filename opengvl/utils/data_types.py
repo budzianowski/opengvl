@@ -94,3 +94,12 @@ class Example:
     """
     eval_episode: Episode
     context_episodes: list[Episode]
+
+@dataclass
+class InferredExample:
+    """
+    Container for a single evaluation example consisting of one
+    evaluation episode and multiple context episodes, with model predictions.
+    """
+    eval_episode: InferredEpisode
+    context_episodes: list[Episode]

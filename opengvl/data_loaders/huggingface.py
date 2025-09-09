@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import numpy as np
 from datasets.utils.logging import disable_progress_bar
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
