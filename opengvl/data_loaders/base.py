@@ -84,8 +84,6 @@ class BaseDataLoader(ABC):
         frames: Sequence[ImageT],
         instruction: str,
         episode_index: int,
-        shuffle: bool | None = None,
-        rng: np.random.Generator | None = None,
     ) -> Episode:
         """Construct an Episode from raw frames.
 
@@ -93,38 +91,35 @@ class BaseDataLoader(ABC):
         - Optionally shuffles their presentation order
         - Fills both original and shuffled completion rates
         """
-        prev = self.shuffle
-        if shuffle is not None:
-            self.shuffle = shuffle
-        try:
-            if len(frames) == 0:
-                raise ValueError
+        # Deterministic per-episode RNG to ensure stable shuffles across runs
+        per_ep_rng = np.random.default_rng(self.seed + int(episode_index))
 
-            # Convert and choose subset
-            frames_np = self._ensure_numpy(frames)
-            selected_orig = self._select_indices(len(frames_np))
-            selected_frames = [frames_np[i] for i in selected_orig]
+        if len(frames) == 0:
+            raise ValueError
 
-            # Original timeline metadata (sorted ascending)
-            original_indices = list(selected_orig)
-            original_completion = self._linear_completion(len(selected_frames))
+        # Convert and choose subset
+        frames_np = self._ensure_numpy(frames)
+        selected_orig = self._select_indices(len(frames_np))
+        selected_frames = [frames_np[i] for i in selected_orig]
 
-            # Shuffled presentation order
-            shuffled_indices = self._maybe_shuffle(original_indices, rng=rng)
-            shuffled_frames = [frames_np[i] for i in shuffled_indices]
-            shuffled_completion_approx = self._linear_completion(len(shuffled_frames))
+        # Original timeline metadata (sorted ascending)
+        original_indices = list(selected_orig)
+        original_completion = self._linear_completion(len(selected_frames))
 
-            starting_frame = frames_np[original_indices[0]]
+        # Shuffled presentation order
+        shuffled_indices = self._maybe_shuffle(original_indices, rng=per_ep_rng)
+        shuffled_frames = [frames_np[i] for i in shuffled_indices]
+        shuffled_completion_approx = self._linear_completion(len(shuffled_frames))
 
-            return Episode(
-                instruction=str(instruction),
-                starting_frame=starting_frame,
-                episode_index=int(episode_index),
-                original_frames_indices=original_indices,
-                shuffled_frames_indices=shuffled_indices,
-                shuffled_frames_approx_completion_rates=shuffled_completion_approx,
-                original_frames_task_completion_rates=original_completion,
-                shuffled_frames=shuffled_frames,
-            )
-        finally:
-            self.shuffle = prev
+        starting_frame = frames_np[original_indices[0]]
+
+        return Episode(
+            instruction=str(instruction),
+            starting_frame=starting_frame,
+            episode_index=int(episode_index),
+            original_frames_indices=original_indices,
+            shuffled_frames_indices=shuffled_indices,
+            shuffled_frames_approx_completion_rates=shuffled_completion_approx,
+            original_frames_task_completion_rates=original_completion,
+            shuffled_frames=shuffled_frames,
+        )

@@ -39,7 +39,7 @@ class HuggingFaceDataLoader(BaseDataLoader):
         self.ds_meta = LeRobotDatasetMetadata(dataset_name)
         self.max_episodes = min(max_episodes or self.ds_meta.total_episodes, self.ds_meta.total_episodes)
         # deterministic episode order
-        self._all_indices = list(range(self.max_episodes))
+        self._all_episodes_indices = list(range(self.max_episodes))
         self._cursor = 0
 
     def _load_episode_frames(self, episode_index: int) -> tuple[list, str]:
@@ -52,7 +52,7 @@ class HuggingFaceDataLoader(BaseDataLoader):
         return frames, instruction
 
     def _build_context(self, exclude_index: int) -> list[Episode]:
-        pool = [i for i in self._all_indices if i != exclude_index]
+        pool = [i for i in self._all_episodes_indices if i != exclude_index]
         if not pool or self.num_context_episodes <= 0:
             return []
         # Deterministic sampling for the given eval episode
@@ -62,20 +62,20 @@ class HuggingFaceDataLoader(BaseDataLoader):
         ctx_eps: list[Episode] = []
         for idx in chosen:
             frames, instruction = self._load_episode_frames(idx)
-            ctx_eps.append(self._build_episode(frames=frames, instruction=instruction, episode_index=idx, rng=rng))
+            ctx_eps.append(self._build_episode(frames=frames, instruction=instruction, episode_index=idx))
         return ctx_eps
 
     def load_fewshot_input(self, episode_index: int | None = None) -> FewShotInput:
         if episode_index is None:
-            if self._cursor >= len(self._all_indices):
+            if self._cursor >= len(self._all_episodes_indices):
                 self._cursor = 0
-            episode_index = self._all_indices[self._cursor]
+            episode_index = self._all_episodes_indices[self._cursor]
             self._cursor += 1
 
         logger.info(f"Loading episode {episode_index} from {self.dataset_name}")
         frames, instruction = self._load_episode_frames(episode_index)
         eval_ep = self._build_episode(frames=frames, instruction=instruction, episode_index=episode_index)
-        context = self._build_context(episode_index)
+        context = self._build_context(exclude_index=episode_index)
         return FewShotInput(eval_episode=eval_ep, context_episodes=context)
 
     def reset(self) -> None:
