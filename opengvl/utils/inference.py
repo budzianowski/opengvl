@@ -1,4 +1,5 @@
 import json
+import math
 import re
 from collections.abc import Iterable
 from pathlib import Path
@@ -30,7 +31,6 @@ def extract_percentages(
     Returns:
         List of integer percentages within [0, 100].
     """
-    import math
 
     vals: list[float] = []
     for match in PERCENT_FLOAT_RE.finditer(text):

@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from hydra.utils import instantiate
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
 from opengvl.clients.base import BaseModelClient
 from opengvl.data_loaders.base import BaseDataLoader
@@ -40,7 +41,11 @@ def _validate_config(config: DictConfig) -> None:
 
 def _load_examples(loader: BaseDataLoader, n: int, dataset_name: str) -> list[FewShotInput]:
     logger.info(f"Generating {n} examples…")
-    examples: list[FewShotInput] = [loader.load_fewshot_input() for _ in range(n)]
+    examples: list[FewShotInput] = []  # [loader.load_fewshot_input() for _ in range(n)]
+    for i in range(n):
+        logger.info(f"Loading example {i + 1}/{n}")
+        ex = loader.load_fewshot_input()
+        examples.append(ex)
     logger.success(f"Loaded {len(examples)} few-shot examples from dataset '{dataset_name}'")
     return examples
 
@@ -125,6 +130,14 @@ def main(config: DictConfig) -> None:
     jsonl_path = output_dir / "predictions.jsonl"
 
     examples = _load_examples(data_loader, num_examples, config.dataset.name)
+    logger.info(
+        f"Loaded {len(examples)} (in-context trajectories (0 or more) + eval trajectory) examples for prediction"
+    )
+    for ex in examples:
+        print(ex)
+    if len(examples) == 0:
+        logger.warning("No examples loaded; exiting")
+        return
     voc_metric = VOCMetric()
     logger.debug(f"Metrics initialized: {voc_metric.name}")
 
@@ -132,7 +145,7 @@ def main(config: DictConfig) -> None:
         predict_on_fewshot_input(
             idx, num_examples, ex, client, prompt_template, save_raw, voc_metric, config.dataset.name
         )
-        for idx, ex in enumerate(examples)
+        for idx, ex in tqdm(enumerate(examples), total=num_examples, desc="Predicting")
     ]
 
     logger.info(f"Serializing {len(records)} prediction records to {jsonl_path}")

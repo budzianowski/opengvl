@@ -24,6 +24,10 @@ class PredictionRecord:
         Images are omitted by default (cannot JSON serialize numpy arrays)."""
 
         eval_ep = self.example.eval_episode
+        ctx_eps = self.example.context_episodes
+        ctx_count = len(ctx_eps)
+        ctx_indices = [ep.episode_index for ep in ctx_eps]
+        ctx_frames_per_ep = [len(ep.shuffled_frames) for ep in ctx_eps]
         base = {
             "index": self.index,
             "dataset": self.dataset,
@@ -35,6 +39,9 @@ class PredictionRecord:
                 "original_frames_task_completion_rates": eval_ep.original_frames_task_completion_rates,
                 "shuffled_frames_approx_completion_rates": eval_ep.shuffled_frames_approx_completion_rates,
             },
+            "context_episodes_count": ctx_count,
+            "context_episodes_indices": ctx_indices,
+            "context_episodes_frames_per_episode": ctx_frames_per_ep,
             "predicted_percentages": self.predicted_percentages,
             "valid_length": self.valid_length,
             "metrics": self.metrics,

@@ -111,6 +111,21 @@ class Example:
     eval_episode: Episode
     context_episodes: list[Episode]
 
+    def __repr__(self) -> str:
+        eval_frames = len(self.eval_episode.shuffled_frames)
+        ctx_count = len(self.context_episodes)
+        ctx_frames_list = [len(ep.shuffled_frames) for ep in self.context_episodes]
+        ctx_frames_total = sum(ctx_frames_list)
+        return (
+            "Example("
+            f"eval_episode_index={self.eval_episode.episode_index}, "
+            f"eval_frames={eval_frames}, "
+            f"context_episodes={ctx_count}, "
+            f"context_frames_per_episode={ctx_frames_list}, "
+            f"context_frames_total={ctx_frames_total}"
+            ")"
+        )
+
 
 @dataclass
 class InferredFewShotResult:

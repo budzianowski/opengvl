@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 import numpy as np
+from loguru import logger
 from scipy.stats import spearmanr
 from scipy.stats._stats_py import SignificanceResult
 
@@ -26,6 +27,7 @@ class VOCMetric(Metric):
         # reorder predictions into chronological order by sorting shuffled indices
         order = np.argsort(eval_ep.shuffled_frames_indices)
         chrono = preds[order]
+        logger.info(f"VOC compute | \n- preds={preds}\n- order={order}\n- chrono={chrono}")
         if len(chrono) <= 1:
             return MetricResult(name=self.name, value=0.0, details={"note": "insufficient length"})
         if np.allclose(chrono, chrono[0]):
