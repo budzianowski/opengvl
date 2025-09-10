@@ -30,8 +30,8 @@ ImageTorch: TypeAlias = TorchTensorLike
 # Polymorphic image type accepted across the codebase
 ImageT: TypeAlias = ImagePIL | ImageNumpy | ImageTorch
 
-# Base64-encoded PNG string as produced by encode_image
-EncodedImage: TypeAlias = str
+# Base64-encoded PNG chars as produced by encode_image
+EncodedImage: TypeAlias = bytes
 
 __all__ = [
     "EncodedImage",

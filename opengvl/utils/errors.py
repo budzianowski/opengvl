@@ -27,3 +27,19 @@ class ShuffledFramesLengthMismatch(Exception):
 class ShuffledFramesIndicesNotSubset(Exception):
     def __init__(self):
         super().__init__("All shuffled_frames_indices must be present in original_frames_indices")
+
+
+class PercentagesCountMismatch(Exception):
+    """Raised when the number of extracted percentages doesn't match the expected length."""
+
+    def __init__(self, expected: int, found: int):
+        super().__init__(f"Expected {expected} percentages, found {found}")
+        self.expected = expected
+        self.found = found
+
+
+class PercentagesNormalizationError(Exception):
+    """Raised when percentages cannot be normalized to sum to 100."""
+
+    def __init__(self, message: str | None = None):
+        super().__init__(message or "Unable to normalize percentages (invalid sum)")

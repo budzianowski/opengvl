@@ -28,6 +28,7 @@ from opengvl.results.prediction import PredictionRecord, aggregate_metrics
 from opengvl.utils import inference as infer_utils
 from opengvl.utils.data_types import Example as FewShotInput
 from opengvl.utils.data_types import InferredFewShotResult
+from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
 
@@ -65,21 +66,15 @@ def predict_on_fewshot_input(
         logger.error(f"Model generation failed for example {idx}: {e}")
         predicted: list[int] = []
         response_text = f"<error: {e}>"
-    logger.debug(f"Response {response_text}")
+    logger.debug(f"Response on example {idx}:\n{response_text}")
 
     expected_len = len(ex.eval_episode.shuffled_frames)
-    predicted = infer_utils.extract_percentages(response_text, expected=expected_len)
-
-    logger.debug(f"Extracted percentages: {predicted}")
-    if not predicted:
-        logger.warning(f"No percentages extracted for example {idx}")
-    elif len(predicted) != expected_len:
-        logger.warning(f"Length mismatch example {idx}: predicted={len(predicted)} expected={expected_len}")
-    else:
-        logger.success(f"Extracted {len(predicted)} percentages (expected) for example {idx}")
-    logger.debug(f"Predictions: {predicted}")
-    if save_raw:
-        logger.debug(f"Raw response length: {len(response_text)} chars")
+    try:
+        predicted: list[int] = infer_utils.extract_percentages(response_text, expected=expected_len)
+        logger.success(f"Extracted {len(predicted)} percentages on example {idx}")
+    except (PercentagesCountMismatch, PercentagesNormalizationError) as e:
+        logger.error(f"Extraction error on example {idx}: {e}")
+        raise
 
     inferred: InferredFewShotResult = infer_utils.build_inferred_example(ex, predicted)
     metric_res = voc_metric.compute(inferred)

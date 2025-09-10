@@ -25,7 +25,7 @@ class GemmaClient(BaseModelClient):
         self,
         prompt: str,
         eval_episode: Episode,
-        context_episodes: List[Episode],
+        context_episodes: list[Episode],
     ) -> str:
         messages = [
             {

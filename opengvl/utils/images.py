@@ -1,5 +1,6 @@
 import base64
 import io
+from typing import cast
 
 import numpy as np
 from loguru import logger
@@ -91,4 +92,4 @@ def encode_image(image: ImageT) -> EncodedImage:
 
     buffer = io.BytesIO()
     pil_image.save(buffer, format="PNG")
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return cast(bytes, base64.b64encode(buffer.getvalue()).decode("utf-8"))
