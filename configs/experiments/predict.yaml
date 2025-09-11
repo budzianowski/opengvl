@@ -33,7 +33,7 @@ dataset:
 prediction:
   num_examples: 25   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
-  output_dir: ${hydra:run.dir}/predictions
+  output_dir: ${hydra:run.dir}/${hydra:job.num}/predictions
 
 # Hydra output directory naming pattern --------------------------------------
 hydra:
@@ -45,5 +45,5 @@ hydra:
     subdir: ${hydra.job.num}
   sweeper:
     params:
-      dataset.num_context_episodes: 0, 2
+      dataset.num_context_episodes: 2
 

@@ -75,9 +75,3 @@ class GeminiClient(BaseModelClient):
         if response.text is None:
             raise RuntimeError("No text response from Gemini model")
         return response.text
-
-
-if __name__ == "__main__":
-    load_dotenv("./.env", override=True)
-    client = GeminiClient()
-    print(client)

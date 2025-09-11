@@ -81,9 +81,3 @@ class KimiThinkingClient(BaseModelClient):
         trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         response = self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
         return response
-
-
-if __name__ == "__main__":
-    load_dotenv("./.env", override=True)
-    client = KimiThinkingClient()
-    print(client)

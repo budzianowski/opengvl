@@ -43,3 +43,10 @@ class PercentagesNormalizationError(Exception):
 
     def __init__(self, message: str | None = None):
         super().__init__(message or "Unable to normalize percentages (invalid sum)")
+
+
+class MaxRetriesExceeded(Exception):
+    """Raised when an operation fails after exhausting retry attempts."""
+
+    def __init__(self, attempts: int):
+        super().__init__(f"Max retries exceeded after {attempts} attempts")

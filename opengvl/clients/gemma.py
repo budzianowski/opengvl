@@ -88,9 +88,3 @@ class GemmaClient(BaseModelClient):
 
         decoded = self.processor.decode(output, skip_special_tokens=True)
         return decoded
-
-
-if __name__ == "__main__":
-    load_dotenv("./.env", override=True)
-    client = GemmaClient()
-    print(client)
