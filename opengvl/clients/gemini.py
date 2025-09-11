@@ -7,9 +7,7 @@ from google.genai.types import Part
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
-
-# third-party imports
-from opengvl.data_loader import Episode
+from opengvl.utils.data_types import Episode
 from opengvl.utils.images import encode_image
 
 BARE_MIN_LEN_TO_DISPLAY: Final[int] = len("Frame XX:  ")

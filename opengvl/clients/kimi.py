@@ -1,14 +1,13 @@
 from typing import List
 
-# third-party imports
 import torch
 from dotenv import load_dotenv
 from loguru import logger
 from transformers import AutoModelForCausalLM, AutoProcessor
 
 from opengvl.clients.base import BaseModelClient
-from opengvl.data_loader import Episode
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
+from opengvl.utils.data_types import Episode
 from opengvl.utils.images import to_pil
 
 

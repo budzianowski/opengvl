@@ -6,11 +6,14 @@ downstream modules.
 """
 
 from abc import ABC, abstractmethod
+from time import sleep
 
 from loguru import logger
 
-from opengvl.data_loader import Episode
+from opengvl.utils.data_types import Episode
 from opengvl.utils.rate_limiter import SECS_PER_MIN, RateLimiter
+
+MAX_RETRIES = 4  # how many times to retry on rate limit errors
 
 
 class BaseModelClient(ABC):
@@ -47,16 +50,26 @@ class BaseModelClient(ABC):
         Returns:
             The raw model textual output.
         """
-        if self.rpm > 0.0:
-            logger.info(f"Applying rate limit: {self.rpm} requests per minute")
-            with RateLimiter(max_calls=self.rpm, period=SECS_PER_MIN):
-                logger.info("Lock acquired, generating response...")
-                res = self._generate_response_impl(prompt, eval_episode, context_episodes)
+        for call_attempt in range(1, MAX_RETRIES + 1):
+            logger.debug(f"Model generation attempt {call_attempt}/{MAX_RETRIES}")
+            try:
+                if self.rpm > 0.0:
+                    logger.info(f"Applying rate limit: {self.rpm} requests per minute")
+                    with RateLimiter(max_calls=self.rpm, period=SECS_PER_MIN):
+                        logger.info("Lock acquired, generating response...")
+                        res = self._generate_response_impl(prompt, eval_episode, context_episodes)
 
-        else:
-            res = self._generate_response_impl(prompt, eval_episode, context_episodes)
-        logger.info(f"Model response length: {len(res)} characters")
-        return res
+                else:
+                    res = self._generate_response_impl(prompt, eval_episode, context_episodes)
+                logger.info(f"Model response length: {len(res)} characters")
+            except Exception as e:
+                logger.warning(f"Model generation attempt {call_attempt + 1} failed: {e}")
+                timesleep = 2 ** (call_attempt + 2)
+                logger.warning(f"Retrying after {timesleep} seconds...")
+                sleep(timesleep)
+                continue
+            return res
+        raise RuntimeError("Max retries exceeded")
 
     @abstractmethod
     def _generate_response_impl(
