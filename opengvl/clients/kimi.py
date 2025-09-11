@@ -25,7 +25,7 @@ class KimiThinkingClient(BaseModelClient):
         )
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
 
-    def generate_response(
+    def _generate_response_impl(
         self,
         prompt: str,
         eval_episode: Episode,

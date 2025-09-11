@@ -24,7 +24,7 @@ class OpenAIClient(BaseModelClient):
         self.detail = detail
         logger.info(f"Using OpenAI model {self.model_id}")
 
-    def generate_response(
+    def _generate_response_impl(
         self,
         prompt: str,
         eval_episode: Episode,

@@ -18,7 +18,8 @@ BARE_MIN_LEN_TO_DISPLAY: Final[int] = len("Frame XX:  ")
 class GeminiClient(BaseModelClient):
     """Gemini client calling Google GenAI API for image+text content."""
 
-    def __init__(self, model_name: str = "gemini-2.5-flash-lite-preview-06-17"):
+    def __init__(self, rpm, model_name: str):
+        super().__init__(rpm=rpm)
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise OSError("GEMINI_API_KEY not set in environment")
@@ -26,7 +27,7 @@ class GeminiClient(BaseModelClient):
         self.model_name = model_name
         logger.info(f"Using Gemini model {self.model_name}")
 
-    def generate_response(
+    def _generate_response_impl(
         self,
         prompt: str,
         eval_episode: Episode,

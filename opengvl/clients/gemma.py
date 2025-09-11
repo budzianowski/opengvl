@@ -1,5 +1,3 @@
-from typing import List
-
 # third-party imports
 import torch
 from dotenv import load_dotenv
@@ -21,7 +19,7 @@ class GemmaClient(BaseModelClient):
         self.processor = AutoProcessor.from_pretrained(model_id)
         logger.info(type(self.processor))
 
-    def generate_response(
+    def _generate_response_impl(
         self,
         prompt: str,
         eval_episode: Episode,

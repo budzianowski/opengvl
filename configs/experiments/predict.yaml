@@ -31,7 +31,7 @@ dataset:
   num_context_episodes: 2  # How many in-context episodes to provide
 
 prediction:
-  num_examples: 50   # How many FewShotInput predictions to perform
+  num_examples: 25   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
   output_dir: ${hydra:run.dir}/predictions
 
@@ -45,5 +45,5 @@ hydra:
     subdir: ${hydra.job.num}
   sweeper:
     params:
-      dataset.num_context_episodes: 0,1,2,3
+      dataset.num_context_episodes: 0, 2
 
