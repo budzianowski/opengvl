@@ -1,18 +1,20 @@
+from typing import cast
 
 import torch
 from loguru import logger
 from transformers import AutoModelForCausalLM, AutoProcessor
 
 from opengvl.clients.base import BaseModelClient
+from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
-from opengvl.utils.data_types import Episode
 from opengvl.utils.images import to_pil
 
 
 class KimiThinkingClient(BaseModelClient):
     """Client for Kimi Thinking VL model."""
 
-    def __init__(self, model_id: str = "moonshotai/Kimi-VL-A3B-Thinking-2506"):
+    def __init__(self, model_id: str = "moonshotai/Kimi-VL-A3B-Thinking-2506", rpm: float = 0.0):
+        super().__init__(rpm=rpm)
         logger.info(f"Loading Kimi Thinking model {model_id} ...")
         self.model = AutoModelForCausalLM.from_pretrained(
             model_id,
@@ -22,60 +24,38 @@ class KimiThinkingClient(BaseModelClient):
         )
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
 
-    def _generate_response_impl(
-        self,
-        prompt: str,
-        eval_episode: Episode,
-        context_episodes: list[Episode],
-    ) -> str:
+    def _generate_from_events(self, events: list[Event]) -> str:
         images = []
-        prompt_parts = [prompt, "Initial robot scene:"]
-        images.append(to_pil(eval_episode.starting_frame))
-        prompt_parts.append("In the initial robot scene, the task completion percentage is 0.")
-
-        counter = 1
-        for ctx_episode in context_episodes:
-            for task_completion, frame in zip(
-                ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames
-            ):
-                prompt_parts.append(f"Frame {counter}:")
-                images.append(to_pil(frame))
-                prompt_parts.append(f"Task Completion Percentage: {task_completion:.1f}%")
-                counter += 1
-
-        prompt_parts.append(
-            f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {{i}}: Task Completion Percentages:{{}}%"
-        )
-        prompt_parts.append("Be rigorous and precise; percentage reflects task completion.")
-        prompt_parts.append("Remember: frames are in random order.")
-
-        for frame in eval_episode.shuffled_frames:
-            prompt_parts.append(f"Frame {counter}:")
-            images.append(to_pil(frame))
-            counter += 1
-
         messages = [{"role": "user", "content": []}]
-        image_idx = 0
-        for part in prompt_parts:
-            messages[0]["content"].append({"type": "text", "text": part})
-            # Heuristic: after a 'Frame X:' line or initial scene line, attach image if available.
-            if (part.startswith("Frame ") or part == "Initial robot scene:") and image_idx < len(images):
+        for ev in events:
+            if isinstance(ev, TextEvent):
+                messages[0]["content"].append({"type": "text", "text": ev.text})
+            elif isinstance(ev, ImageEvent):
                 messages[0]["content"].append({"type": "image"})
-                image_idx += 1
+                images.append(to_pil(cast(ImageT, ev.image)))
 
         prompt_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
-        inputs = self.processor(text=prompt_text, images=images, return_tensors="pt").to(
-            self.model.device, dtype=torch.bfloat16
+        inputs = self.processor(
+            text=prompt_text,
+            images=images,
+            return_tensors="pt",
+        ).to(
+            self.model.device,
+            dtype=torch.bfloat16,
         )
 
         input_len = inputs["input_ids"].shape[-1]
         if input_len > 128_000:
-            raise ValueError(f"Input length {input_len} exceeds maximum allowed length of 128000 tokens.")
+            raise ValueError("Input length too large")
         logger.info(f"Input length: {input_len}")
 
         generated_ids = self.model.generate(
-            **inputs, max_new_tokens=min(MAX_TOKENS_TO_GENERATE, 32768), temperature=0.8
+            **inputs,
+            max_new_tokens=min(
+                MAX_TOKENS_TO_GENERATE,
+                32768,
+            ),
+            temperature=0.8,
         )
         trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
-        response = self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-        return response
+        return self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
