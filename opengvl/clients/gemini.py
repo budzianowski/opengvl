@@ -1,5 +1,5 @@
 import os
-from typing import Final, List
+from typing import Final
 
 from google.genai.client import Client
 from google.genai.types import Part
@@ -28,7 +28,7 @@ class GeminiClient(BaseModelClient):
         self,
         prompt: str,
         eval_episode: Episode,
-        context_episodes: List[Episode],
+        context_episodes: list[Episode],
     ) -> str:
         contents: list = [prompt]
         contents.append("Initial robot scene:")

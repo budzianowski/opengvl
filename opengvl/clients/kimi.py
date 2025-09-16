@@ -1,4 +1,3 @@
-from typing import List
 
 import torch
 from loguru import logger
@@ -27,7 +26,7 @@ class KimiThinkingClient(BaseModelClient):
         self,
         prompt: str,
         eval_episode: Episode,
-        context_episodes: List[Episode],
+        context_episodes: list[Episode],
     ) -> str:
         images = []
         prompt_parts = [prompt, "Initial robot scene:"]

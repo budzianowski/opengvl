@@ -1,7 +1,6 @@
 """OpenAI multimodal client implementation."""
 
 import os
-from typing import List
 
 import openai
 from loguru import logger
@@ -28,7 +27,7 @@ class OpenAIClient(BaseModelClient):
         self,
         prompt: str,
         eval_episode: Episode,
-        context_episodes: List[Episode],
+        context_episodes: list[Episode],
     ) -> str:
         content = [{"type": "input_text", "text": prompt}]
 
