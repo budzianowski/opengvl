@@ -50,8 +50,6 @@ def main(config: DictConfig) -> None:
     logger.info(
         f"Loaded {len(examples)} (in-context trajectories (0 or more) + eval trajectory) examples for prediction"
     )
-    for ex in examples:
-        print(ex)
     if len(examples) == 0:
         logger.warning("No examples loaded; exiting")
         return

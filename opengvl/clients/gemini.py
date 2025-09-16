@@ -1,7 +1,6 @@
 import os
 from typing import Final, List
 
-from dotenv import load_dotenv
 from google.genai.client import Client
 from google.genai.types import Part
 from loguru import logger

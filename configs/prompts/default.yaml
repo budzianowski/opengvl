@@ -1,6 +1,3 @@
-# Default prompt template.
-# Use {instruction} placeholder for task.
-
 template: |
   You are an expert roboticist tasked to predict task completion percentages for frames of a robot for the task of {instruction}.
   The task completion percentages are between 0 and 100, where 100 corresponds to full task completion.

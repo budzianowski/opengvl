@@ -1,5 +1,3 @@
-# Rigorous prompt with explicit formatting guidance.
-
 template: |
   You are an expert roboticist. Predict task completion percentages for frames of a robot for the task: {instruction}.
   Percentages are in [0, 100], where 100 is full completion. Frames may be shuffled.

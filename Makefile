@@ -1,7 +1,7 @@
 .PHONY: install format lint test clean help
 
 # Install dependencies
-install:
+install:p
 	uv sync
 
 # Format code

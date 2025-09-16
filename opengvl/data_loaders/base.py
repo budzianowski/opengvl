@@ -37,7 +37,7 @@ class BaseDataLoader(ABC):
         """Load a single FewShotInput (eval + optional context episodes)."""
 
     def load_fewshot_inputs(self, n: int) -> list[FewShotInput]:
-        """Convenience: load ``n`` FewShotInput structures in sequence."""
+        """Load ``n`` FewShotInput structures in sequence."""
         return [self.load_fewshot_input() for _ in range(int(n))]
 
     def reset(self) -> None:

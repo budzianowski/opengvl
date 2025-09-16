@@ -4,6 +4,7 @@ from contextlib import ContextDecorator
 
 SECS_PER_MIN = 60.0
 
+
 class RateLimiter(ContextDecorator):
     """Simple rate limiter context manager.
 

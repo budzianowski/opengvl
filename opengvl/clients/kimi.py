@@ -1,7 +1,6 @@
 from typing import List
 
 import torch
-from dotenv import load_dotenv
 from loguru import logger
 from transformers import AutoModelForCausalLM, AutoProcessor
 

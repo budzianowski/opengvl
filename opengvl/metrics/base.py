@@ -1,5 +1,3 @@
-"""Metrics abstractions for prediction evaluation."""
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any

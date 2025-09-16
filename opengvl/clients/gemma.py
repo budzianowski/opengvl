@@ -1,5 +1,4 @@
 import torch
-from dotenv import load_dotenv
 from loguru import logger
 from transformers import AutoProcessor, Gemma3ForConditionalGeneration
 
