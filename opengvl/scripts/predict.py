@@ -56,9 +56,20 @@ def main(config: DictConfig) -> None:
     voc_metric = VOCMetric()
     logger.debug(f"Metrics initialized: {voc_metric.name}")
 
+    # Load prompt phrasing from dedicated config section (required; fall back to empty)
+    prompt_phrases = dict(config.get("prompt_phrases", {})) if hasattr(config, "prompt_phrases") else {}
+
     records = [
         infer_utils.predict_on_fewshot_input(
-            idx, num_examples, ex, client, prompt_template, save_raw, voc_metric, config.dataset.name
+            idx,
+            num_examples,
+            ex,
+            client,
+            prompt_template,
+            save_raw,
+            voc_metric,
+            config.dataset.name,
+            prompt_phrases=prompt_phrases,
         )
         for idx, ex in tqdm(enumerate(examples), total=num_examples, desc="Predicting")
     ]

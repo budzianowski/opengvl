@@ -140,6 +140,8 @@ def predict_on_fewshot_input(
     save_raw: bool,
     voc_metric,
     dataset_name: str,
+    *,
+    prompt_phrases: dict[str, str] | None = None,
 ):
     """Run model prediction and metric computation on a single few-shot input.
 
@@ -151,7 +153,12 @@ def predict_on_fewshot_input(
     prompt = format_prompt(prompt_template, instruction=ex.eval_episode.instruction)
     logger.debug(f"Prompt (truncated 200 chars): {prompt[:200]}")
     try:
-        response_text = client.generate_response(prompt, ex.eval_episode, ex.context_episodes)
+        response_text = client.generate_response(
+            prompt,
+            ex.eval_episode,
+            ex.context_episodes,
+            prompt_phrases=(prompt_phrases or {}),
+        )
     except (RuntimeError, ValueError, OSError) as e:
         logger.error(f"Model generation failed for example {idx}: {e}")
         predicted: list[int] = []

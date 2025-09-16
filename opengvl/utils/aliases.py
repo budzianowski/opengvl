@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any, Protocol, TypeAlias, runtime_checkable
 
 import numpy as np
@@ -32,6 +33,20 @@ ImageT: TypeAlias = ImagePIL | ImageNumpy | ImageTorch
 
 # Base64-encoded PNG chars as produced by encode_image
 EncodedImage: TypeAlias = bytes
+
+
+@dataclass(frozen=True)
+class Event:
+    """Marker base for prompt events."""
+
+@dataclass(frozen=True)
+class TextEvent(Event):
+    text: str
+
+@dataclass(frozen=True)
+class ImageEvent(Event):
+    image: ImageT
+
 
 __all__ = [
     "EncodedImage",

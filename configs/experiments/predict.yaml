@@ -4,6 +4,7 @@ defaults:
   - data_loader: huggingface
   - model: gemini
   - prompts: rigorous
+  - prompt_phrases: rigorous
   - _self_
 
 seed: 2137          # Global seed (propagated to loader & any RNG-dependent logic)
