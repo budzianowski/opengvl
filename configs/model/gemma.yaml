@@ -1,3 +1,2 @@
-# Gemma 3 client (local transformers)
 _target_: opengvl.clients.gemma.GemmaClient
 model_id: google/gemma-3-4b-it

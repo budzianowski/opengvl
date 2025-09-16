@@ -1,4 +1,3 @@
-# OpenAI multimodal client
 _target_: opengvl.clients.openai.OpenAIClient
 model_id: gpt-4o-mini
 detail: high

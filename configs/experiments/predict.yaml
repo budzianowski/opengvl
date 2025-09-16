@@ -1,32 +1,14 @@
-###############################################################################
-# Predict experiment configuration
-#
-# This Hydra config composes:
-#   - dataset: dataset metadata & frame sampling parameters
-#   - data_loader: implementation (HuggingFace LeRobot)
-#   - model: LLM / VLM client
-#   - prompts: prompt template (rigorous for structured outputs)
-# Default values are executed with:
-#   HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict
-# Override examples:
-#   HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict dataset=nyudoor model=openai prompts=concise
-#   HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict dataset=nyudoor data_loader.huggingface.num_frames=30
-###############################################################################
 
 defaults:
-  # Order matters. _self_ keeps local keys (seed/shuffle) from being overridden.
   - dataset: nyudoor
   - data_loader: huggingface
   - model: gemini
   - prompts: rigorous
   - _self_
 
-# Global experiment controls --------------------------------------------------
 seed: 2137          # Global seed (propagated to loader & any RNG-dependent logic)
 shuffle: true       # Whether to shuffle frame presentation order
 
-# Prediction runtime parameters (extend as needed, other params are imported
-# in defeaults section ---------------------------
 dataset:
   num_context_episodes: 2  # How many in-context episodes to provide
 
@@ -35,7 +17,6 @@ prediction:
   save_raw: true    # Whether to dump raw model outputs
   output_dir: ${hydra:run.dir}/${hydra:job.num}/predictions
 
-# Hydra output directory naming pattern --------------------------------------
 hydra:
   mode: MULTIRUN # comment this if you don't want to sweep
   run:

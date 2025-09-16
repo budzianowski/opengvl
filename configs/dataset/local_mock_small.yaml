@@ -1,4 +1,3 @@
-# Local mock dataset (small)
 name: local_mock_small
 instruction: "Place the red block on the green platform."
 episodes_files:

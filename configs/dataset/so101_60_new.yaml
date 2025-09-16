@@ -1,4 +1,3 @@
-# SO101_60_new dataset from inference examples
 name: so101_60_new
 dataset_name: "Rorschach4153/so101_60_new"
 camera_index: 0

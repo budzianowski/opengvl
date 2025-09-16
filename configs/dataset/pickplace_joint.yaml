@@ -1,4 +1,3 @@
-# Pick and place joint dataset from inference examples
 name: pickplace_joint
 dataset_name: "willx0909/pickplace_joint"
 camera_index: 0

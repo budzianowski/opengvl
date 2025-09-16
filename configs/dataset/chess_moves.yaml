@@ -1,4 +1,3 @@
-# Chess moves dataset from inference examples
 name: chess_moves
 dataset_name: "dopaul/1500_chess_moves"
 camera_index: 0

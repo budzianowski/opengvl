@@ -1,4 +1,3 @@
-# Excavator toy dataset from inference examples
 name: excavator_toy
 dataset_name: "Mahimana/excavator_toy_v3_dig_dump_v3_51"
 camera_index: 5

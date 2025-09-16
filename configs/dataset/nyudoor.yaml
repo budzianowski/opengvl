@@ -1,4 +1,3 @@
-# NYU Door dataset (placeholder)
 name: nyudoor
 dataset_name: "lerobot/nyu_door_opening_surprising_effectiveness"
 camera_index: 0
