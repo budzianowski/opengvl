@@ -3,12 +3,7 @@
 Steps:
 1. Instantiate data loader & model client via Hydra.
 2. Sample N examples (FewShotInput) from loader.
-3. For each example:
-   - Build prompt from template.
-   - Call model client.
-   - Extract percentages via regex.
-   - Build InferredEpisode / InferredExample structures.
-   - Compute metrics (VOC, etc.).
+3. For each example, call the shared prediction helper.
 4. Persist JSONL outputs (one line per example) + aggregated metrics summary.
 """
 
@@ -25,92 +20,14 @@ from tqdm import tqdm
 from opengvl.clients.base import BaseModelClient
 from opengvl.data_loaders.base import BaseDataLoader
 from opengvl.metrics.voc import VOCMetric
-from opengvl.results.prediction import PredictionRecord, aggregate_metrics
+from opengvl.results.prediction import aggregate_metrics
 from opengvl.utils import inference as infer_utils
-from opengvl.utils.data_types import Example as FewShotInput
-from opengvl.utils.data_types import InferredFewShotResult
-from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError
-from opengvl.utils.hydra import ensure_required_keys
-from opengvl.utils.prompts import format_prompt
-
-
-def _validate_config(config: DictConfig) -> None:
-    for key in ("dataset", "data_loader", "model", "prompts", "prediction"):
-        ensure_required_keys(config, key)
-
-
-def _load_examples(loader: BaseDataLoader, n: int, dataset_name: str) -> list[FewShotInput]:
-    logger.info(f"Generating {n} examples…")
-    examples: list[FewShotInput] = []  # [loader.load_fewshot_input() for _ in range(n)]
-    for i in range(n):
-        logger.info(f"Loading example {i + 1}/{n}")
-        ex = loader.load_fewshot_input()
-        examples.append(ex)
-    logger.success(f"Loaded {len(examples)} few-shot examples from dataset '{dataset_name}'")
-    return examples
-
-
-def predict_on_fewshot_input(
-    idx: int,
-    total: int,
-    ex: FewShotInput,
-    client: BaseModelClient,
-    prompt_template: str,
-    save_raw: bool,
-    voc_metric: VOCMetric,
-    dataset_name: str,
-) -> PredictionRecord:
-    logger.info(
-        f"Processing example {idx + 1}/{total} (episode_index={ex.eval_episode.episode_index}) from {dataset_name}"
-    )
-    prompt = format_prompt(prompt_template, instruction=ex.eval_episode.instruction)
-    logger.debug(f"Prompt (truncated 200 chars): {prompt[:200]}")
-    try:
-        response_text = client.generate_response(prompt, ex.eval_episode, ex.context_episodes)
-    except (RuntimeError, ValueError, OSError) as e:
-        logger.error(f"Model generation failed for example {idx}: {e}")
-        predicted: list[int] = []
-        response_text = f"<error: {e}>"
-    logger.debug(f"Response on example {idx}:\n{response_text}")
-
-    expected_len = len(ex.eval_episode.shuffled_frames)
-    try:
-        predicted: list[int] = infer_utils.extract_percentages(response_text, expected=expected_len)
-        logger.success(f"Extracted {len(predicted)} percentages on example {idx}")
-    except (PercentagesCountMismatch, PercentagesNormalizationError) as e:
-        logger.error(f"Extraction error on example {idx}: {e}")
-        raise
-
-    inferred: InferredFewShotResult = infer_utils.build_inferred_example(ex, predicted)
-    metric_res = voc_metric.compute(inferred)
-    metrics_payload = {metric_res.name: metric_res.value}
-
-    if metric_res.details:
-        for k, v in metric_res.details.items():
-            metrics_payload[f"{metric_res.name}_{k}"] = v
-
-    logger.debug(
-        f"Metrics example {idx}: {metric_res.name}="
-        f"{(metric_res.value if metric_res.value is not None else float('nan')):.4f}"
-        f"{(' details=' + str(metric_res.details)) if metric_res.details else ''}"
-    )
-    record = PredictionRecord(
-        index=idx,
-        dataset=dataset_name,
-        example=inferred,
-        predicted_percentages=predicted,
-        valid_length=len(predicted) == len(ex.eval_episode.shuffled_frames),
-        metrics=metrics_payload,
-        raw_response=response_text if save_raw else None,
-    )
-    logger.info(f"Example {idx}: preds={len(predicted)}/{len(ex.eval_episode.shuffled_frames)} VOC={metric_res.value}")
-    return record
 
 
 @hydra.main(version_base=None, config_path="../../configs", config_name="experiments/predict")
 def main(config: DictConfig) -> None:
     """Main prediction script entry point."""
-    _validate_config(config)
+    infer_utils.validate_prediction_config(config)
     load_dotenv(override=True)
     logger.info("Environment variables loaded (dotenv)")
     logger.info(f"Configuration:\n{OmegaConf.to_yaml(config)}")
@@ -129,7 +46,7 @@ def main(config: DictConfig) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     jsonl_path = output_dir / "predictions.jsonl"
 
-    examples = _load_examples(data_loader, num_examples, config.dataset.name)
+    examples = infer_utils.load_fewshot_examples(data_loader, num_examples, config.dataset.name)
     logger.info(
         f"Loaded {len(examples)} (in-context trajectories (0 or more) + eval trajectory) examples for prediction"
     )
@@ -142,7 +59,7 @@ def main(config: DictConfig) -> None:
     logger.debug(f"Metrics initialized: {voc_metric.name}")
 
     records = [
-        predict_on_fewshot_input(
+        infer_utils.predict_on_fewshot_input(
             idx, num_examples, ex, client, prompt_template, save_raw, voc_metric, config.dataset.name
         )
         for idx, ex in tqdm(enumerate(examples), total=num_examples, desc="Predicting")

@@ -66,10 +66,6 @@ class GeminiClient(BaseModelClient):
             counter += 1
 
         logger.debug(f"Contents length: {len(contents)} parts")
-        # # prefixes of them
-        # for i, c in enumerate(contents):
-        #     if isinstance(c, str) and len(c) > BARE_MIN_LEN_TO_DISPLAY:
-        #         logger.debug(f"Contents part {i}: text (truncated 100 chars):\n{c[:100]}")
 
         response = self.client.models.generate_content(model=self.model_name, contents=contents)
         if response.text is None:
