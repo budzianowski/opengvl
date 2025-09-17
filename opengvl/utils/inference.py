@@ -7,6 +7,9 @@ from pathlib import Path
 from loguru import logger
 from omegaconf import DictConfig
 
+from opengvl.clients.base import BaseModelClient
+from opengvl.results.prediction import PredictionRecord
+from opengvl.utils.constants import N_DEBUG_PROMPT_CHARS
 from opengvl.utils.data_types import Example as FewShotInput
 from opengvl.utils.data_types import InferredEpisode, InferredFewShotResult
 from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError
@@ -97,11 +100,6 @@ def save_jsonl(records: Iterable[dict], path: Path) -> None:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-# -----------------------------
-# Prediction pipeline helpers
-# -----------------------------
-
-
 def validate_prediction_config(config: DictConfig) -> None:
     """Ensure required top-level keys are present for prediction runs.
 
@@ -135,7 +133,7 @@ def predict_on_fewshot_input(
     idx: int,
     total: int,
     ex: FewShotInput,
-    client,
+    client: BaseModelClient,
     prompt_template: str,
     save_raw: bool,
     voc_metric,
@@ -151,7 +149,7 @@ def predict_on_fewshot_input(
         f"Processing example {idx + 1}/{total} (episode_index={ex.eval_episode.episode_index}) from {dataset_name}"
     )
     prompt = format_prompt(prompt_template, instruction=ex.eval_episode.instruction)
-    logger.debug(f"Prompt (truncated 200 chars): {prompt[:200]}")
+    logger.debug(f"Prompt (truncated {N_DEBUG_PROMPT_CHARS} chars): {prompt[:N_DEBUG_PROMPT_CHARS]}...")
     try:
         response_text = client.generate_response(
             prompt,
@@ -186,7 +184,6 @@ def predict_on_fewshot_input(
         f"{(metric_res.value if metric_res.value is not None else float('nan')):.4f}"
         f"{(' details=' + str(metric_res.details)) if metric_res.details else ''}"
     )
-    from opengvl.results.prediction import PredictionRecord  # local import to avoid heavy dependencies at import time
 
     record = PredictionRecord(
         index=idx,

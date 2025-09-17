@@ -7,6 +7,7 @@ from transformers import AutoModelForCausalLM, AutoProcessor
 from opengvl.clients.base import BaseModelClient
 from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
+from opengvl.utils.errors import InputTooLongError
 from opengvl.utils.images import to_pil
 
 
@@ -46,7 +47,7 @@ class KimiThinkingClient(BaseModelClient):
 
         input_len = inputs["input_ids"].shape[-1]
         if input_len > 128_000:
-            raise ValueError("Input length too large")
+            raise InputTooLongError(input_len, 128_000)
         logger.info(f"Input length: {input_len}")
 
         generated_ids = self.model.generate(

@@ -1,10 +1,9 @@
-
 defaults:
   - dataset: nyudoor
   - data_loader: huggingface
   - model: gemini
   - prompts: rigorous
-  - prompt_phrases: rigorous
+  - prompt_phrases: default
   - _self_
 
 seed: 2137          # Global seed (propagated to loader & any RNG-dependent logic)
@@ -28,4 +27,5 @@ hydra:
   sweeper:
     params:
       dataset.num_context_episodes: 2
+  # Rely on config_path and defaults; no extra search paths required
 

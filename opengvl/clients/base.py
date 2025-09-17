@@ -96,10 +96,10 @@ class BaseModelClient(ABC):
         raise MaxRetriesExceeded(MAX_RETRIES)
 
     def _validate_and_normalize_prompt_phrases(self, phrases: dict[str, str]) -> dict[str, str]:
-        """Ensure all required phrase keys are present and are strings.
+        """Ensure all required phrase keys are present and non-empty strings.
 
         Returns a normalized dict that includes only the required keys.
-        Raises ValueError if any required key is missing or not a string.
+        Raises ValueError if any required key is missing, not a string, or an empty string.
         Logs a debug message for any extra keys.
         """
         required_keys = [
@@ -113,13 +113,13 @@ class BaseModelClient(ABC):
         normalized: dict[str, str] = {}
         for k in required_keys:
             key = k.value
-            if key not in phrases or not isinstance(phrases[key], str):
+            if key not in phrases or not isinstance(phrases[key], str) or phrases[key].strip() == "":
                 missing.append(key)
             else:
                 normalized[key] = phrases[key]
 
         if missing:
-            raise ValueError("Missing or invalid prompt phrases for required keys: " + ", ".join(missing))
+            raise ValueError("Missing or invalid (empty) prompt phrases for required keys: " + ", ".join(missing))
 
         # Log extra keys to help users diagnose config typos
         extras = [k for k in phrases if k not in normalized]
