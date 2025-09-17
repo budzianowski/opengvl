@@ -108,12 +108,13 @@ class BaseModelClient(ABC):
             PromptPhraseKey.CONTEXT_FRAME_LABEL_TEMPLATE,
             PromptPhraseKey.CONTEXT_FRAME_COMPLETION_TEMPLATE,
             PromptPhraseKey.EVAL_FRAME_LABEL_TEMPLATE,
+            PromptPhraseKey.EVAL_TASK_COMPLETION_INSTRUCTION,
         ]
         missing: list[str] = []
         normalized: dict[str, str] = {}
         for k in required_keys:
             key = k.value
-            if key not in phrases or not isinstance(phrases[key], str) or phrases[key].strip() == "":
+            if key not in phrases:
                 missing.append(key)
             else:
                 normalized[key] = phrases[key]
@@ -155,10 +156,22 @@ class BaseModelClient(ABC):
                 )
                 counter += 1
 
+        for phrase in phrases[PromptPhraseKey.EVAL_TASK_COMPLETION_INSTRUCTION.value]:
+            yield TextEvent(phrase.format(instruction=eval_episode.instruction))
+
+        # contents.append(
+        #     f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames "
+        #     "that are presented in random order. For each frame, format your response as follow: "
+        #     "Frame {i}: Task Completion Percentages:{}%"
+        # )
+        # contents.append("Be rigorous and precise; percentage reflects task completion.")
+        # contents.append("Remember: frames are in random order.")
+
         # Evaluation frames (no completion values)
         for frame in eval_episode.shuffled_frames:
             yield TextEvent(phrases[PromptPhraseKey.EVAL_FRAME_LABEL_TEMPLATE.value].format(i=counter))
             yield ImageEvent(frame)
+            yield TextEvent("")
             counter += 1
 
     def _generate_response_impl(

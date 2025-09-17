@@ -58,7 +58,7 @@ def main(config: DictConfig) -> None:
 
     # Load prompt phrasing from dedicated config section (required; fall back to empty)
     prompt_phrases = dict(config.get("prompt_phrases", {})) if hasattr(config, "prompt_phrases") else {}
-
+    logger.debug(f"Prompt phrases: {prompt_phrases}")
     records = [
         infer_utils.predict_on_fewshot_input(
             idx,

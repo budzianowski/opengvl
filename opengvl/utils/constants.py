@@ -12,3 +12,4 @@ class PromptPhraseKey(StrEnum):
     CONTEXT_FRAME_LABEL_TEMPLATE = "context_frame_label_template"
     CONTEXT_FRAME_COMPLETION_TEMPLATE = "context_frame_completion_template"
     EVAL_FRAME_LABEL_TEMPLATE = "eval_frame_label_template"
+    EVAL_TASK_COMPLETION_INSTRUCTION = "eval_task_completion_instruction"
