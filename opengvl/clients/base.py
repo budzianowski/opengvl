@@ -156,8 +156,8 @@ class BaseModelClient(ABC):
                 )
                 counter += 1
 
-        for phrase in phrases[PromptPhraseKey.EVAL_TASK_COMPLETION_INSTRUCTION.value]:
-            yield TextEvent(phrase.format(instruction=eval_episode.instruction))
+        for instruction_str in phrases[PromptPhraseKey.EVAL_TASK_COMPLETION_INSTRUCTION.value]:
+            yield TextEvent(instruction_str.format(instruction=eval_episode.instruction))
 
         # contents.append(
         #     f"Now, for the task of {eval_episode.instruction}, output the task completion percentage for the following frames "
