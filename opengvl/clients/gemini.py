@@ -13,7 +13,7 @@ from opengvl.utils.images import encode_image
 class GeminiClient(BaseModelClient):
     """Gemini client calling Google GenAI API for image+text content."""
 
-    def __init__(self, rpm, model_name: str):
+    def __init__(self, *, rpm: float = 0.0, model_name: str):
         super().__init__(rpm=rpm)
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
