@@ -86,7 +86,7 @@ class BaseModelClient(ABC):
                     )
                 logger.info(f"Model response length: {len(res)} characters")
             except (RuntimeError, ValueError, OSError) as e:
-                logger.warning(f"Model generation attempt {call_attempt + 1} failed: {e}")
+                logger.warning(f"Model generation attempt {call_attempt} failed: {e}")
                 timesleep = 2 ** (call_attempt + 2)
                 logger.warning(f"Retrying after {timesleep} seconds...")
                 sleep(timesleep)
