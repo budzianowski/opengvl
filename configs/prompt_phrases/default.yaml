@@ -1,0 +1,9 @@
+initial_scene_label: "Initial robot scene:"
+initial_scene_completion: "In the initial robot scene, the task completion percentage is 0%."
+context_frame_label_template: "Frame {i}:"
+context_frame_completion_template: "Task Completion Percentage: {p}%"
+eval_frame_label_template: "Frame {i}:"
+eval_task_completion_instruction:
+  - "Now, for the task of {instruction}, output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follow: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Be rigorous and precise; percentage reflects task completion."
+  - "Remember: frames are in random order."

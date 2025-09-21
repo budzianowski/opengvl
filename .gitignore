@@ -5,21 +5,22 @@
 # Virtual Environment folder created by Poetry
 # This should always be ignored!
 .venv/
-
-# Python caches and compiled files
+.env
+# Python caches and compiled files/images
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.sif
 
-# Distribution / packaging
+# Distribution / packaging / hydra
 dist/
 build/
 *.egg-info/
 *.egg
 wheels/
 experimental/
-
+outputs/
 # IPython Notebook checkpoints
 .ipynb_checkpoints
 

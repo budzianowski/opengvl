@@ -1,0 +1,67 @@
+Bootstrap: docker
+From: python:3.11-slim
+
+
+%files
+    pyproject.toml /app/pyproject.toml
+    uv.lock /app/uv.lock
+    opengvl /app/opengvl
+    configs /app/configs
+    README.md /app/README.md
+
+%post
+    set -e
+    export DEBIAN_FRONTEND=noninteractive
+
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        git \
+        build-essential \
+        cmake \
+        python3-dev \
+        pkg-config \
+        ffmpeg \
+        libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev \
+        libswscale-dev libswresample-dev libavfilter-dev \
+        ca-certificates \
+        curl
+
+    # Optional: CUDA toolkits and drivers are typically provided by the host with --nv;
+    # If you need CUDA libs in the image, uncomment the following and ensure versions match PyTorch wheels
+    # apt-get install -y --no-install-recommends nvidia-cuda-toolkit
+
+    # Install uv
+    pip install --no-cache-dir --upgrade pip uv
+
+    # Project layout already placed under /app via %files
+    cd /app
+
+    # Install project dependencies using the lockfile (creates /app/.venv)
+    # lerobot is installed from source per [tool.uv.sources] mapping in pyproject.toml
+    uv sync --frozen --no-dev
+
+    # Clean
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+    export PYTHONUNBUFFERED=1
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONPATH=/app:${PYTHONPATH}
+    export PATH=/app/.venv/bin:${PATH}
+    export HF_HOME=/root/.cache/huggingface
+    export HF_DATASETS_CACHE=${HF_HOME}/datasets
+    export TRANSFORMERS_CACHE=${HF_HOME}/transformers
+    export PIP_CACHE_DIR=/root/.cache/pip
+    export UV_CACHE_DIR=/root/.cache/uv
+    export UV_LINK_MODE=copy
+
+
+%help
+    This image is built with uv using the lock file.
+    - lerobot is installed from source via Git as configured in pyproject.toml
+    - ffmpeg and libav* dev packages are present for PyAV builds
+    
+        GPU:
+            Run with GPU (if host has NVIDIA):
+                apptainer run --nv opengvl.sif ...

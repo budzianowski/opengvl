@@ -1,0 +1,6 @@
+name: so101_60_new
+dataset_name: "Rorschach4153/so101_60_new"
+camera_index: 0
+max_episodes: 150
+num_frames: 15
+num_context_episodes: 1

@@ -1,0 +1,6 @@
+name: utokyo_xarm_bimanual
+dataset_name: "lerobot/utokyo_xarm_bimanual"
+camera_index: 0
+max_episodes: 50
+num_frames: 15
+num_context_episodes: 2
