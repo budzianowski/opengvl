@@ -1,11 +1,11 @@
-# OpenGVL: Open Generative Value Learning
+# OpenGVL: Benchmarking Visual Temporal Progress for Data Curation
 
 [![PyPI version](https://badge.fury.io/py/gvl.svg)](https://badge.fury.io/py/gvl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/budzianowski/opengvl)
-[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)](https://arxiv.org/abs/2411.04549)
+[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)](TODO)
 
-An open-source implementation of Generative Value Learning for robotics and beyond.
+Generative Value Learning for data curation.
 
 <p align="center">
   <img src="assets/header/opengvl_header_4x2.png" alt="OpenGVL Header Grid (4x2)" width="100%">
@@ -67,17 +67,6 @@ OpenGVL exposes a simple, unified interface across VLMs and data sources, making
 4. Parse the VLM’s textual outputs into per-frame completion percentages.
 5. Compute VOC/metrics against ground truth and save results.
 
-### Key Features
-- Modular design: swap models, datasets, prompts, and loaders with minimal changes.
-- Extensible: add new VLM clients and datasets via lightweight adapter classes.
-- Configuration-driven: powered by Hydra for reproducible, override-friendly experiments.
-- Multi-VLM support: out-of-the-box clients for Gemini, Gemma, Kimi, and OpenAI GPT models.
-- Reproducible runs: containerized execution via Apptainer/Singularity.
-
-### Supported Models and Data Sources
-- Models: Gemini, Gemma, Kimi, OpenAI GPT series
-- Data sources: Hugging Face Hub datasets and local folders
-- Prompts: configurable prompt templates for concise or detailed instructions
 
 ### Architecture Overview
 
@@ -157,15 +146,8 @@ Tip: you can override any config at the CLI, e.g. `model.temperature=0.5`.
    ```
 
 2.  set up a virtual environment:
-   Using `uv`:
     ```bash
     PYTHONPATH=. uv run python3 -c "print('all packages installed')" # in root of repository
-    ```
-    Or using `venv`:
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate
-    pip install . # optionally -e for dev
     ```
 
 ### Environment Variables
@@ -179,9 +161,6 @@ OPENAI_API_KEY="your-openai-api-key"
 GOOGLE_API_KEY="your-google-api-key"
 HUGGING_FACE_HUB_TOKEN="your-hugging-face-token"
 ```
-- OpenAI API key: for OpenAI GPT models
-- Google API key: for Gemini
-- Hugging Face Hub token: for gated models/datasets
 
 ---
 
@@ -373,31 +352,6 @@ Notes:
 - The framework automatically numbers frames across context and evaluation. Your instructions should make it explicit that only frames without provided percentages should be predicted (see our `rigorous` prompt for a safe pattern).
 - The phrase keys are required; missing/empty keys will raise a clear `ValueError` before calling the model.
 
----
-
-## Repository Structure
-
-```
-.
-├── apptainer/        # Apptainer/Singularity definition for containerization
-├── configs/          # Hydra configuration files
-│   ├── data_loader/
-│   ├── dataset/
-│   ├── model/
-│   ├── prompts/
-│   └── experiments/
-├── notebooks/        # Jupyter notebooks for analysis and inference
-├── opengvl/          # Main Python package
-│   ├── clients/        # VLM clients (Gemini, OpenAI, etc.)
-│   ├── data_loaders/   # Data loaders (HuggingFace, local)
-│   ├── metrics/        # Evaluation metrics (e.g., VOC)
-│   ├── scripts/        # Entry-point scripts (e.g., predict.py)
-│   └── utils/          # Utilities (e.g., parsing helpers)
-├── tests/            # Tests
-├── .env.example
-├── pyproject.toml
-└── README.md
-```
 
 ---
 
@@ -432,11 +386,11 @@ Suggested checklist:
 If you use OpenGVL in your research, please cite:
 
 ```bibtex
-@article{opengvl2024,
+@article{opengvl2025,
   title={OpenGVL: Benchmarking Visual Temporal Progress for Data Curation},
-  author={{Authors}},
-  journal={arXiv preprint arXiv:2411.04549},
-  year={2024}
+  author={{Paweł Budzianowski, Emilia Wiśnios, Gracjan Góral, Igor Kulakov, Viktor Petrenko, Krzysztof Walas}},
+  journal={arXiv preprint arXiv:2509.22501},
+  year={2025}
 }
 ```
 
