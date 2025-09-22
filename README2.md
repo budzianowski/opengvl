@@ -39,6 +39,7 @@ An open-source implementation of Generative Value Learning for robotics and beyo
   - [Extending OpenGVL](#extending-opengvl)
     - [Adding a New Model](#adding-a-new-model)
     - [Adding a New Dataset](#adding-a-new-dataset)
+    - [Modifying Prompts (Templates and Phrases)](#modifying-prompts-templates-and-phrases)
   - [Repository Structure](#repository-structure)
   - [Known Issues \& Troubleshooting](#known-issues--troubleshooting)
   - [Contributing](#contributing)
@@ -245,42 +246,132 @@ PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/expe
 ## Extending OpenGVL
 
 ### Adding a New Model
-1. Implement a client under `opengvl/clients/` inheriting from `opengvl.clients.base.BaseClient` and implement `predict()`:
-   ```python
-   # opengvl/clients/my_model.py
-   from .base import BaseClient
 
-   class MyModelClient(BaseClient):
-       def __init__(self, model_name: str, **kwargs):
-           super().__init__(model_name, **kwargs)
-           # Initialization logic
+OpenGVL clients inherit from `opengvl.clients.base.BaseModelClient`. You only need to implement `_generate_from_events(self, events: list[Event]) -> str`, which receives a provider-agnostic sequence of text/image events already assembled by the framework. See `opengvl/clients/gemini.py` for a complete reference implementation.
 
-       def predict(self, messages, **kwargs):
-           # Prediction logic
-           return "Frame 1: 50%, Frame 2: 100%"
-   ```
-2. Add a config in `configs/model/my_model.yaml`:
-   ```yaml
-   _target_: opengvl.clients.my_model.MyModelClient
-   model_name: "my-model-name"
-   ```
-3. Run:
-   ```bash
-   python opengvl/scripts/predict.py model=my_model ...
-   ```
+1) Implement a client in `opengvl/clients/my_model.py`:
+
+```python
+# opengvl/clients/my_model.py (concise example)
+import os
+from typing import cast, List
+
+from loguru import logger
+
+from opengvl.clients.base import BaseModelClient
+from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
+from opengvl.utils.images import encode_image
+
+
+class MyModelClient(BaseModelClient):
+  def __init__(self, *, rpm: float = 0.0, model_name: str):
+    super().__init__(rpm=rpm)
+    if not os.getenv("MY_MODEL_API_KEY"):
+      raise OSError("Missing MY_MODEL_API_KEY")
+    self.model_name = model_name
+    logger.info(f"Using MyModel '{self.model_name}'")
+
+  def _generate_from_events(self, events: List[Event]) -> str:
+    parts: List[bytes | str] = []
+    for ev in events:
+      if isinstance(ev, TextEvent):
+        parts.append(ev.text)
+      elif isinstance(ev, ImageEvent):
+        parts.append(encode_image(cast(ImageT, ev.image)))
+
+    # Call your provider with `parts` and return the provider's text response.
+    # Placeholder response for docs/tests:
+    return "Frame 1: Task Completion: 50%\nFrame 2: Task Completion: 100%"
+```
+
+2) Add a Hydra config at `configs/model/my_model.yaml`:
+
+```yaml
+_target_: opengvl.clients.my_model.MyModelClient
+model_name: my-model-name
+rpm: 15  # requests per minute (rate limiter)
+```
+
+3) Use your model via CLI or experiment config:
+
+```bash
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict \
+  model=my_model
+```
+---
 
 ### Adding a New Dataset
-1. Add a config in `configs/dataset/my_dataset.yaml`:
-   ```yaml
-   name: "my-dataset-name"
-   split: "test"
-   # Additional parameters
-   ```
-2. Choose a loader (`huggingface`, `local`, or your own).
-3. Run:
-   ```bash
-   python opengvl/scripts/predict.py dataset=my_dataset ...
-   ```
+
+Create a dataset config that matches the keys used by our HuggingFace loader (`configs/data_loader/huggingface.yaml`). Example:
+
+```yaml
+# configs/dataset/my_dataset.yaml
+name: my_dataset
+dataset_name: "org-or-user/my_dataset_on_hub"
+camera_index: 0
+max_episodes: 100
+num_frames: 15
+num_context_episodes: 2
+```
+
+Then choose a loader (e.g., Hugging Face) in your experiment or via CLI:
+
+```bash
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict \
+  dataset=my_dataset data_loader=huggingface
+```
+
+---
+
+### Modifying Prompts (Templates and Phrases)
+
+Prompts are split into two layers:
+- A high-level prompt `template` (under `configs/prompts/`) with free-form text.
+- Structured `prompt_phrases` (under `configs/prompt_phrases/`) with required keys validated by the code.
+
+1) Create a new prompt template file:
+
+```yaml
+# configs/prompts/my_prompt.yaml
+template: |
+  You are an expert roboticist. Predict task completion percentages for the task: {instruction}.
+  Percentages are in [0, 100], where 100 is full completion. Frames may be shuffled.
+  For each frame that does NOT already have a completion percentage provided,
+  output strictly: "Frame {{i}}: Task Completion: {{p}}%".
+  Be precise and consistent; do not include extra text.
+```
+
+2) (Optional) Create a custom phrase set. The keys must match `PromptPhraseKey` in `opengvl/utils/constants.py`:
+
+```yaml
+# configs/prompt_phrases/my_style.yaml
+initial_scene_label: "Initial robot scene:"
+initial_scene_completion: "In the initial robot scene, the task completion percentage is 0%."
+context_frame_label_template: "Frame {i}:"
+context_frame_completion_template: "Task Completion: {p}%"
+eval_frame_label_template: "Frame {i}:"
+eval_task_completion_instruction:
+  - "Now, for the task of {instruction}, output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follows: Frame {{i}}: Task Completion: {{p}}%"
+  - "Be rigorous and precise; percentage reflects task completion."
+  - "Remember: frames are in random order."
+```
+
+3) Use your custom prompt in an experiment or from CLI:
+
+```bash
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict \
+  prompts=my_prompt prompt_phrases=my_style
+```
+
+Notes:
+- The framework automatically numbers frames across context and evaluation. Your instructions should make it explicit that only frames without provided percentages should be predicted (see our `rigorous` prompt for a safe pattern).
+- The phrase keys are required; missing/empty keys will raise a clear `ValueError` before calling the model.
 
 ---
 
