@@ -1,322 +1,411 @@
-# OpenGVL: Open Generative Value Learning
+# OpenGVL: Benchmarking Visual Temporal Progress for Data Curation
 
 [![PyPI version](https://badge.fury.io/py/gvl.svg)](https://badge.fury.io/py/gvl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/your-username/opengvl-codebase_refactor)
-[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)](https://arxiv.org/abs/2411.04549)
+[![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/budzianowski/opengvl)
+[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)](TODO)
 
-An open-source implementation of Generative Value Learning for robotics and beyond.
+Generative Value Learning for data curation.
 
-<table>
-  <tr>
-    <td align="center"><a href="#quick-start">Quick Start</a></td>
-    <td align="center"><a href="#getting-started">Getting Started</a></td>
-    <td align="center"><a href="#extending-opengvl">Extending OpenGVL</a></td>
-    <td align="center"><a href="#evaluation">Evaluation</a></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="assets/header/opengvl_header_4x2.png" alt="OpenGVL Header Grid (4x2)" width="100%">
+</p>
+
+<div align="center">
+  <a href="#quick-start">🚀 Quick Start</a> •
+  <a href="#getting-started">🧰 Getting Started</a> •
+  <a href="#configuration-hydra">⚙️ Configuration</a> •
+  <a href="#extending-opengvl">🧩 Extending</a> •
+  <a href="#evaluation">📊 Evaluation</a>
+</div>
+
+---
+
+- [OpenGVL: Open Generative Value Learning](#opengvl-open-generative-value-learning)
+  - [About](#about)
+    - [Why OpenGVL?](#why-opengvl)
+    - [How it works (high level)](#how-it-works-high-level)
+    - [Key Features](#key-features)
+    - [Supported Models and Data Sources](#supported-models-and-data-sources)
+    - [Architecture Overview](#architecture-overview)
+  - [Quick Start](#quick-start)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [Environment Variables](#environment-variables)
+  - [VLM Input, Output, and Few-Shot Learning](#vlm-input-output-and-few-shot-learning)
+  - [Running with Apptainer/Singularity](#running-with-apptainersingularity)
+  - [Configuration (Hydra)](#configuration-hydra)
+  - [Extending OpenGVL](#extending-opengvl)
+    - [Adding a New Model](#adding-a-new-model)
+    - [Adding a New Dataset](#adding-a-new-dataset)
+    - [Modifying Prompts (Templates and Phrases)](#modifying-prompts-templates-and-phrases)
+  - [Repository Structure](#repository-structure)
+  - [Known Issues \& Troubleshooting](#known-issues--troubleshooting)
+  - [Contributing](#contributing)
+  - [Citation](#citation)
+  - [Acknowledgments](#acknowledgments)
+  - [License](#license)
+
+---
 
 ## About
 
-OpenGVL provides a benchmark to evaluate how well Vision-Language Models (VLMs) understand temporal progress in robotics tasks. It can automatically annotate and curate large-scale robotics datasets by predicting task completion from video frames, making it practical for data quality assessment.
+OpenGVL provides a benchmark and toolkit to evaluate how well vision-language models (VLMs) understand temporal progress in robotic tasks. It enables automatic annotation and curation of large-scale robotics datasets by predicting task completion from video frames, making it practical for data quality assessment and filtering.
 
-OpenGVL is a flexible, extensible framework with a simple, unified interface for working with different VLMs and robotics datasets. It serves as a solid foundation for researchers and developers to experiment, build, and contribute to Generative Value Learning in robotics.
+OpenGVL exposes a simple, unified interface across VLMs and data sources, making it a solid foundation for research and practical deployments of Generative Value Learning in robotics and related domains.
 
-### Key Features
+### Why OpenGVL?
+- Evaluate temporal understanding of VLMs with a principled metric (Value-Order Correlation, VOC).
+- Curate datasets at scale by estimating per-frame task completion.
+- Standardize prompts, images, and outputs across multiple models and datasets.
 
-- Modular design: swap models, datasets, and prompts with ease.
-- Extensible: add new models and datasets with minimal code.
-- Configuration-driven: powered by Hydra for reproducible experiments.
-- Supports multiple VLMs: out-of-the-box clients for Gemini, Gemma, Kimi, and OpenAI's GPT series.
+### How it works (high level)
+1. Load evaluation episodes (shuffled frames) and optional context episodes (ordered, with known progress).
+2. Build a prompt with few-shot examples.
+3. Query a chosen VLM with images + prompt.
+4. Parse the VLM’s textual outputs into per-frame completion percentages.
+5. Compute VOC/metrics against ground truth and save results.
+
+
+### Architecture Overview
+
+```mermaid
+flowchart TB
+  %% High-level overview of the OpenGVL pipeline (top-down for readability)
+
+  subgraph S0["🔧 Config (Hydra)"]
+    C1["models • prompts • datasets • loaders • experiment settings"]
+  end
+
+  subgraph S1["🗂️ Data Assembly"]
+    D1["Evaluation episode (shuffled frames)"]
+    D2["Optional context episodes (ordered, known % )"]
+  end
+
+  subgraph S2["🧠 Inference"]
+    I1["Compose prompt (template + phrases + dataset instruction)"]
+    I2["Attach frames (eval + optional context)"]
+    I3["VLM API client (Gemini • GPT • Gemma • Kimi)"]
+  end
+
+  subgraph S3["📈 Scoring & Artifacts"]
+    E1["Parse per-frame completion %"]
+    E2["Compute VOC (temporal order correlation)"]
+    E3["Save predictions.jsonl + logs + plots"]
+  end
+
+  C1 --> D1
+  C1 -. optional config .-> D2
+  D1 --> I1
+  D2 --> I1
+  I1 --> I2 --> I3 --> E1 --> E2 --> E3
+
+  K1([🔑 .env API keys]) -.-> I3
+  K2([📦 Apptainer/Singularity]) -. reproducible runs .-> I3
+  K3([💾 Local cache / HF datasets]) -.-> D1
+
+  style S0 fill:#0ea5e9,stroke:#0284c7,color:#fff,stroke-width:2px
+  style S1 fill:#10b981,stroke:#059669,color:#fff,stroke-width:2px
+  style S2 fill:#8b5cf6,stroke:#7c3aed,color:#fff,stroke-width:2px
+  style S3 fill:#f59e0b,stroke:#d97706,color:#111827,stroke-width:2px
+
+  classDef optional fill:#f3f4f6,stroke:#9ca3af,color:#111827,stroke-dasharray: 5 5
+  class K1,K2,K3 optional
+```
+
+---
 
 ## Quick Start
 
-Run predictions using the `predict.py` script. Configuration is managed via YAML files in `configs`.
-
-After completing setup in Getting Started, run:
+After setup (see Getting Started), run a prediction using the experiment config at `configs/experiments/predict.yaml`:
 
 ```bash
-python opengvl/scripts/predict.py \
-    model=gemini \
-    dataset=berkeleymvp \
-    data_loader=huggingface
+HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict
 ```
 
-Results are saved in the `outputs` directory, organized by date and time.
+Results are saved under `outputs/DATE_TIME/` with predictions, raw outputs, and metrics.
+
+Tip: you can override any config at the CLI, e.g. `model.temperature=0.5`.
+
+---
 
 ## Getting Started
 
-Follow these steps to set up a local development environment.
-
 ### Prerequisites
-
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip for package management
 
 ### Installation
-
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/opengvl-codebase_refactor.git
-   cd opengvl-codebase_refactor
+   git clone https://github.com/budzianowski/opengvl.git
+   cd opengvl
    ```
 
-2. Create a virtual environment:
-   Using `uv`:
-   ```bash
-   uv venv
-   source .venv/bin/activate
-   ```
-   Or using `venv`:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   ```
+2.  set up a virtual environment:
+    ```bash
+    PYTHONPATH=. uv run python3 -c "print('all packages installed')" # in root of repository
+    ```
 
-3. Install dependencies:
-   Using `uv`:
-   ```bash
-   uv pip install -e .
-   ```
-   Or using `pip`:
-   ```bash
-   pip install -e .
-   ```
+### Environment Variables
+Create a `.env` file in the project root:
+```bash
+cp .env.example .env
+```
+Then edit `.env` with your credentials:
+```
+OPENAI_API_KEY="your-openai-api-key"
+GOOGLE_API_KEY="your-google-api-key"
+HUGGING_FACE_HUB_TOKEN="your-hugging-face-token"
+```
 
-4. Set up environment variables:
-   Create a `.env` file in the project root. You will need API keys for proprietary models and, in some cases, a Hugging Face token for models or datasets.
-   ```bash
-   cp .env.example .env
-   ```
-   Then edit `.env` with your credentials:
-   ```
-   OPENAI_API_KEY="your-openai-api-key"
-   GOOGLE_API_KEY="your-google-api-key"
-   HUGGING_FACE_HUB_TOKEN="your-hugging-face-token"
-   ```
-   - OpenAI API key: for models like GPT-5
-   - Google API key: for models like Gemini
-   - Hugging Face Hub token: for downloading models (e.g., Gemma, Kimi) and accessing private datasets
+---
 
 ## VLM Input, Output, and Few-Shot Learning
 
-OpenGVL benchmarks temporal understanding of VLMs through a few-shot learning pipeline. Here’s how it works:
+Each prediction uses:
+1) A prompt constructed from a template (e.g., `configs/prompts/concise.yaml`) plus dataset-specific instructions.
+   Example instruction: “Task: Pick up the blue block and place it in the red bowl. Estimate task completion (0–100%) per frame. Frames can be shuffled.”
+2) A set of images:
+   - Evaluation episode: shuffled frames to estimate completion.
+   - Optional context episodes: complete, ordered episodes with known percentages for few-shot guidance.
 
-### VLM Input
+The VLM returns a text response with per-frame percentages. `extract_percentages()` in `opengvl/utils/inference.py` parses the string into a list of integers, e.g., “Frame 1: 50%, Frame 2: 100%, Frame 3: 25%” → `[50, 100, 25]`.
 
-Each prediction uses two components:
-
-1. A prompt constructed from a template (e.g., `configs/prompts/concise.yaml`) and a dataset instruction. For example:
-   > Task: Pick up the blue block and place it in the red bowl. Estimate task completion (0–100%) per frame. Frames can be shuffled.
-
-2. A set of images:
-   - Evaluation episode: a sequence of shuffled frames for which the model estimates completion percentages.
-   - Context episodes (optional): one or more complete episodes used for few-shot learning, with ordered frames and ground-truth percentages.
-
-### VLM Output
-
-The model returns a text response with estimated completion percentages for each evaluation frame. The function `extract_percentages` in `opengvl/utils/inference.py` parses the response into a list of integers.
-
-Example response:
-> Frame 1: 50%, Frame 2: 100%, Frame 3: 25%
-
-Parsed as: `[50, 100, 25]`.
-
-### Few-Shot Learning Pipeline
-
-The `predict.py` script orchestrates the pipeline:
-
-1. Data loading: loads `FewShotInput` examples containing an evaluation episode and optional context episodes.
-2. Prediction: `predict_on_fewshot_input` formats the prompt and sends text and images to the selected VLM client.
-3. Parsing and evaluation: the model response is parsed to extract percentages and compared to ground truth using the Value-Order Correlation (VOC) metric.
-4. Saving results: predictions, raw outputs, and metrics are stored in a `.jsonl` file per experiment.
-
-## Evaluation
-
-Evaluation uses the Value-Order Correlation (VOC) metric implemented in `opengvl/metrics/voc.py`.
-
-VOC measures how well predicted completion percentages for shuffled frames correlate with the true chronological order, using Spearman’s rank correlation. Higher is better.
-
-To run a simple evaluation, use the scripts in `jobs`:
-
-```bash
-bash jobs/run_eval.sh
-```
+---
 
 ## Running with Apptainer/Singularity
 
-For a reproducible and portable environment, use Apptainer (formerly Singularity).
+For reproducible, portable runs:
 
-### Prerequisites
+Prerequisites:
+- [Apptainer](https://apptainer.org/docs/user/main/installation.html)
+- NVIDIA drivers on the host for GPU support (for locally inferred models)
 
-- [Apptainer](https://apptainer.org/docs/user/main/installation.html) installed on your system
-- NVIDIA drivers installed on the host for GPU support
-
-### Building the Container
-
-Build the image from the definition file in `apptainer`:
-
+Build the image:
 ```bash
-cd apptainer
-sudo apptainer build opengvl.sif opengvl.def
-cd ..
+apptainer build opengvl.sif apptainer/opengvl.def
 ```
 
-This creates `opengvl.sif`.
-
-### Running Experiments in the Container
-
-Run any command inside the container using `apptainer run` or `apptainer exec`. The image is configured to use `uv` with all dependencies installed.
-
-To run the quick start prediction with GPU support (`--nv`):
-
+Run the quick start prediction with GPU:
 ```bash
-apptainer run --nv opengvl.sif python opengvl/scripts/predict.py \
-    model=gemini \
-    dataset=berkeleymvp \
-    data_loader=huggingface
+apptainer run --nv opengvl.sif python -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict
 ```
 
-Pass API keys and environment variables via `--env` flags or by exporting them in your shell:
+Tip: pass environment via `--env` flags or export them in your shell prior to `apptainer run`.
 
-```bash
-export OPENAI_API_KEY="your-key"
-export GOOGLE_API_KEY="your-key"
-export HUGGING_FACE_HUB_TOKEN="your-token"
+---
 
-apptainer run --nv opengvl.sif ...
-```
+## Configuration (Hydra)
 
-## Configuration
-
-Configuration is managed with [Hydra](https://hydra.cc/). Files live in `configs`:
-
-- `configs/model/`: model configurations (e.g., `gemini.yaml`, `gemma.yaml`, `openai.yaml`)
-- `configs/dataset/`: dataset configurations
-- `configs/data_loader/`: data loader configurations (e.g., `huggingface.yaml`, `local.yaml`)
+Configuration lives in `configs/`:
+- `configs/model/`: model configs (e.g., `gemini.yaml`, `gemma.yaml`, `openai.yaml`)
+- `configs/dataset/`: dataset configs
+- `configs/data_loader/`: data loader configs (e.g., `huggingface.yaml`, `local.yaml`)
 - `configs/prompts/`: prompt styles
-- `configs/experiments/`: complete experiment configurations
+- `configs/experiments/`: complete experiment presets (e.g., `predict.yaml`)
 
-Override any parameter from the command line. For example, to change Gemini temperature:
-
+Override parameters from the command line. Examples:
 ```bash
-python opengvl/scripts/predict.py model=gemini dataset=berkeleymvp data_loader=huggingface model.temperature=0.5
+# Run with explicit experiment config
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict
+
+# Override individual fields
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict \
+  model=gemini dataset=berkeleymvp data_loader=huggingface model.temperature=0.5
 ```
+
+---
 
 ## Extending OpenGVL
 
 ### Adding a New Model
 
-1. Create a client in `opengvl/clients/` (e.g., `my_model.py`) inheriting from `opengvl.clients.base.BaseClient`. Implement `predict`.
+OpenGVL clients inherit from `opengvl.clients.base.BaseModelClient`. You only need to implement `_generate_from_events(self, events: list[Event]) -> str`, which receives a provider-agnostic sequence of text/image events already assembled by the framework. See `opengvl/clients/gemini.py` for a complete reference implementation.
 
-   ```python
-   # opengvl/clients/my_model.py
-   from .base import BaseClient
+1) Implement a client in `opengvl/clients/my_model.py`:
 
-   class MyModelClient(BaseClient):
-       def __init__(self, model_name: str, **kwargs):
-           super().__init__(model_name, **kwargs)
-           # Initialization logic
+```python
+# opengvl/clients/my_model.py (concise example)
+import os
+from typing import cast, List
 
-       def predict(self, messages, **kwargs):
-           # Prediction logic
-           pass
-   ```
+from loguru import logger
 
-2. Add a configuration file in `configs/model/` (e.g., `my_model.yaml`).
+from opengvl.clients.base import BaseModelClient
+from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
+from opengvl.utils.images import encode_image
 
-   ```yaml
-   # configs/model/my_model.yaml
-   _target_: opengvl.clients.my_model.MyModelClient
-   model_name: "my-model-name"
-   # Other parameters
-   ```
 
-3. Run an experiment:
+class MyModelClient(BaseModelClient):
+  def __init__(self, *, rpm: float = 0.0, model_name: str):
+    super().__init__(rpm=rpm)
+    if not os.getenv("MY_MODEL_API_KEY"):
+      raise OSError("Missing MY_MODEL_API_KEY")
+    self.model_name = model_name
+    logger.info(f"Using MyModel '{self.model_name}'")
 
-   ```bash
-   python opengvl/scripts/predict.py model=my_model ...
-   ```
+  def _generate_from_events(self, events: List[Event]) -> str:
+    parts: List[bytes | str] = []
+    for ev in events:
+      if isinstance(ev, TextEvent):
+        parts.append(ev.text)
+      elif isinstance(ev, ImageEvent):
+        parts.append(encode_image(cast(ImageT, ev.image)))
+
+    # Call your provider with `parts` and return the provider's text response.
+    # Placeholder response for docs/tests:
+    return "Frame 1: Task Completion: 50%\nFrame 2: Task Completion: 100%"
+```
+
+2) Add a Hydra config at `configs/model/my_model.yaml`:
+
+```yaml
+_target_: opengvl.clients.my_model.MyModelClient
+model_name: my-model-name
+rpm: 15  # requests per minute (rate limiter)
+```
+
+3) Use your model via CLI or experiment config:
+
+```bash
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict \
+  model=my_model
+```
+---
 
 ### Adding a New Dataset
 
-1. Add a configuration file in `configs/dataset/` (e.g., `my_dataset.yaml`).
+Create a dataset config that matches the keys used by our HuggingFace loader (`configs/data_loader/huggingface.yaml`). Example:
 
-   ```yaml
-   # configs/dataset/my_dataset.yaml
-   name: "my-dataset-name"
-   split: "test"
-   # Other parameters
-   ```
-
-2. Choose a data loader. Use `huggingface` or `local`, or implement your own. If the dataset is on Hugging Face, select the `huggingface` loader and specify the dataset name.
-
-3. Run an experiment:
-
-   ```bash
-   python opengvl/scripts/predict.py dataset=my_dataset ...
-   ```
-
-## Repository Structure
-
+```yaml
+# configs/dataset/my_dataset.yaml
+name: my_dataset
+dataset_name: "org-or-user/my_dataset_on_hub"
+camera_index: 0
+max_episodes: 100
+num_frames: 15
+num_context_episodes: 2
 ```
-.
-├── apptainer/      # Apptainer/Singularity definition for containerization
-├── configs/        # Hydra configuration files
-│   ├── data_loader/
-│   ├── dataset/
-│   ├── model/
-│   └── prompts/
-├── jobs/           # Shell scripts for running experiments
-├── notebooks/      # Jupyter notebooks for analysis and inference
-├── opengvl/        # Main Python package
-│   ├── clients/      # Clients for different VLMs (Gemini, OpenAI, etc.)
-│   ├── data_loaders/ # Data loaders for different data sources
-│   ├── metrics/      # Evaluation metrics (e.g., VOC)
-│   ├── scripts/      # Main scripts (e.g., prediction)
-│   └── utils/        # Utility functions
-├── tests/          # Test suite
-├── .env.example    # Example environment file
-├── pyproject.toml  # Project metadata and dependencies
-└── README.md
+
+Then choose a loader (e.g., Hugging Face) in your experiment or via CLI:
+
+```bash
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict \
+  dataset=my_dataset data_loader=huggingface
 ```
+
+---
+
+### Modifying Prompts (Templates and Phrases)
+
+Prompts are split into two layers:
+- A high-level prompt `template` (under `configs/prompts/`) with free-form text.
+- Structured `prompt_phrases` (under `configs/prompt_phrases/`) with required keys validated by the code.
+
+1) Create a new prompt template file:
+
+```yaml
+# configs/prompts/my_prompt.yaml
+template: |
+  You are an expert roboticist. Predict task completion percentages for the task: {instruction}.
+  Percentages are in [0, 100], where 100 is full completion. Frames may be shuffled.
+  For each frame that does NOT already have a completion percentage provided,
+  output strictly: "Frame {{i}}: Task Completion: {{p}}%".
+  Be precise and consistent; do not include extra text.
+```
+
+2) (Optional) Create a custom phrase set. The keys must match `PromptPhraseKey` in `opengvl/utils/constants.py`:
+
+```yaml
+# configs/prompt_phrases/my_style.yaml
+initial_scene_label: "Initial robot scene:"
+initial_scene_completion: "In the initial robot scene, the task completion percentage is 0%."
+context_frame_label_template: "Frame {i}:"
+context_frame_completion_template: "Task Completion: {p}%"
+eval_frame_label_template: "Frame {i}:"
+eval_task_completion_instruction:
+  - "Now, for the task of {instruction}, output the task completion percentage for the following frames that are presented in random order. For each frame, format your response as follows: Frame {{i}}: Task Completion: {{p}}%"
+  - "Be rigorous and precise; percentage reflects task completion."
+  - "Remember: frames are in random order."
+```
+
+3) Use your custom prompt in an experiment or from CLI:
+
+```bash
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict \
+  prompts=my_prompt prompt_phrases=my_style
+```
+
+Notes:
+- The framework automatically numbers frames across context and evaluation. Your instructions should make it explicit that only frames without provided percentages should be predicted (see our `rigorous` prompt for a safe pattern).
+- The phrase keys are required; missing/empty keys will raise a clear `ValueError` before calling the model.
+
+
+---
 
 ## Known Issues & Troubleshooting
 
-### Common Issues
-
-- macOS library path issue: if you encounter library loading problems on macOS, set:
+- macOS library path:
   ```bash
   export DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib
   ```
+- GPU OOM (CUDA): reduce `batch_size` or image resolution in the model config (e.g., `configs/model/gemini.yaml`).
+- Hugging Face authentication: ensure `HUGGING_FACE_HUB_TOKEN` is set in `.env` for gated models/private datasets.
+- API rate limits: consider lowering concurrency or increasing `TQDM_MININTERVAL` when applicable.
 
-- CUDA memory issues: if you run into GPU OOM errors, reduce `batch_size` in the model config (e.g., `configs/model/gemini.yaml`).
+---
 
-- Hugging Face authentication: ensure your token is set in `.env` (`HUGGING_FACE_HUB_TOKEN`) for gated models or private datasets.
+## Contributing
+
+Contributions are welcome!
+- Report bugs or request features via GitHub issues.
+- Open pull requests for fixes and enhancements.
+- For substantial changes, please discuss via an issue first and keep PRs focused and well-tested.
+
+Suggested checklist:
+- Add/update tests for new functionality.
+- Include/adjust configs under `configs/` as needed.
+- Update documentation and examples where relevant.
+
+---
 
 ## Citation
 
-If you use OpenGVL in your research, please cite our paper:
+If you use OpenGVL in your research, please cite:
 
 ```bibtex
-@article{opengvl2024,
+@article{opengvl2025,
   title={OpenGVL: Benchmarking Visual Temporal Progress for Data Curation},
-  author={[Authors]},
-  journal={arXiv preprint arXiv:2411.04549},
-  year={2024}
+  author={{Paweł Budzianowski, Emilia Wiśnios, Gracjan Góral, Igor Kulakov, Viktor Petrenko, Krzysztof Walas}},
+  journal={arXiv preprint arXiv:2509.22501},
+  year={2025}
 }
 ```
 
+---
+
 ## Acknowledgments
 
-This work builds upon many excellent projects and ideas:
+We thank the broader open-source community and prior work that inspired OpenGVL:
+- Foundational research on Generative Value Learning ([OpenGVL paper](https://arxiv.org/abs/2411.04549))
+- [LeRobot](https://huggingface.co/lerobot) for dataset infrastructure
+- [Hydra](https://hydra.cc/) for configuration management
+- [Hugging Face](https://huggingface.co/) for dataset hosting/model access
 
-- Foundational research on Generative Value Learning ([arXiv:2411.04549](https://arxiv.org/abs/2411.04549))
-- The [LeRobot](https://huggingface.co/lerobot) project for dataset infrastructure
-- The [Hydra](https://hydra.cc/) framework for configuration management
-- [Hugging Face](https://huggingface.co/) for dataset hosting and model access
-- The broader open-source robotics community for invaluable dataset contributions
+---
 
 ## License
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
