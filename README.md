@@ -72,46 +72,72 @@ OpenGVL exposes a simple, unified interface across VLMs and data sources, making
 
 ```mermaid
 flowchart TB
-  %% High-level overview of the OpenGVL pipeline (top-down for readability)
-
-  subgraph S0["🔧 Config (Hydra)"]
-    C1["models • prompts • datasets • loaders • experiment settings"]
+  %% Enhanced OpenGVL pipeline with improved UX
+  subgraph S0["⚙️ Configuration Layer"]
+    direction LR
+    C1{{"🔧 Hydra Config<br/>• Models & Prompts<br/>• Datasets & Loaders<br/>• Experiment Settings"}}
   end
-
-  subgraph S1["🗂️ Data Assembly"]
-    D1["Evaluation episode (shuffled frames)"]
-    D2["Optional context episodes (ordered, known % )"]
+  
+  subgraph S1["📊 Data Preparation"]
+    direction TB
+    D1[("📹 Evaluation Episode<br/>(Shuffled Frames)")]
+    D2[("🎬 Context Episodes<br/>(Ordered, Known %)")]
+    D1 -.-> D2
   end
-
-  subgraph S2["🧠 Inference"]
-    I1["Compose prompt (template + phrases + dataset instruction)"]
-    I2["Attach frames (eval + optional context)"]
-    I3["VLM API client (Gemini • GPT • Gemma • Kimi)"]
+  
+  subgraph S2["🤖 AI Processing Pipeline"]
+    direction TB
+    I1["✍️ Prompt Composition<br/>Template + Phrases + Instructions"]
+    I2["🖼️ Frame Attachment<br/>Evaluation + Context Frames"]
+    I3{{"🧠 VLM API Gateway<br/>Gemini • GPT-4 • Gemma • Kimi"}}
+    I1 --> I2 --> I3
   end
-
-  subgraph S3["📈 Scoring & Artifacts"]
-    E1["Parse per-frame completion %"]
-    E2["Compute VOC (temporal order correlation)"]
-    E3["Save predictions.jsonl + logs + plots"]
+  
+  subgraph S3["📈 Analytics & Output"]
+    direction TB
+    E1["🔍 Frame Completion Parsing<br/>Per-frame % Analysis"]
+    E2["📏 VOC Computation<br/>Temporal Order Correlation"]
+    E3[("💾 Export Results<br/>predictions.jsonl • logs • plots")]
+    E1 --> E2 --> E3
   end
-
-  C1 --> D1
-  C1 -. optional config .-> D2
-  D1 --> I1
-  D2 --> I1
-  I1 --> I2 --> I3 --> E1 --> E2 --> E3
-
-  K1([🔑 .env API keys]) -.-> I3
-  K2([📦 Apptainer/Singularity]) -. reproducible runs .-> I3
-  K3([💾 Local cache / HF datasets]) -.-> D1
-
-  style S0 fill:#0ea5e9,stroke:#0284c7,color:#fff,stroke-width:2px
-  style S1 fill:#10b981,stroke:#059669,color:#fff,stroke-width:2px
-  style S2 fill:#8b5cf6,stroke:#7c3aed,color:#fff,stroke-width:2px
-  style S3 fill:#f59e0b,stroke:#d97706,color:#111827,stroke-width:2px
-
-  classDef optional fill:#f3f4f6,stroke:#9ca3af,color:#111827,stroke-dasharray: 5 5
-  class K1,K2,K3 optional
+  
+  %% External Dependencies
+  K1{{🔐 Environment Keys<br/>.env API Configuration}}
+  K2{{🐳 Containerization<br/>Apptainer/Singularity}}
+  K3{{💽 Data Sources<br/>Local Cache • HF Datasets}}
+  
+  %% Main flow connections
+  C1 ==> D1
+  C1 -.-> D2
+  D1 ==> I1
+  D2 -.-> I1
+  I3 ==> E1
+  
+  %% External connections
+  K1 -.-> I3
+  K2 -.-> S2
+  K3 -.-> D1
+  
+  %% Enhanced styling
+  style S0 fill:#1e3a8a,stroke:#1d4ed8,color:#ffffff,stroke-width:3px,rx:15
+  style S1 fill:#065f46,stroke:#047857,color:#ffffff,stroke-width:3px,rx:15
+  style S2 fill:#581c87,stroke:#7c3aed,color:#ffffff,stroke-width:3px,rx:15
+  style S3 fill:#dc2626,stroke:#ef4444,color:#ffffff,stroke-width:3px,rx:15
+  
+  %% Node styling
+  style C1 fill:#3b82f6,stroke:#2563eb,color:#ffffff,stroke-width:2px
+  style D1 fill:#10b981,stroke:#059669,color:#ffffff,stroke-width:2px
+  style D2 fill:#6ee7b7,stroke:#34d399,color:#111827,stroke-width:2px
+  style I1 fill:#a855f7,stroke:#9333ea,color:#ffffff,stroke-width:2px
+  style I2 fill:#c084fc,stroke:#a855f7,color:#ffffff,stroke-width:2px
+  style I3 fill:#7c3aed,stroke:#6d28d9,color:#ffffff,stroke-width:2px
+  style E1 fill:#f97316,stroke:#ea580c,color:#ffffff,stroke-width:2px
+  style E2 fill:#fb923c,stroke:#f97316,color:#ffffff,stroke-width:2px
+  style E3 fill:#fbbf24,stroke:#f59e0b,color:#111827,stroke-width:2px
+  
+  %% External dependency styling
+  classDef external fill:#f8fafc,stroke:#64748b,color:#475569,stroke-width:2px,stroke-dasharray:8 4
+  class K1,K2,K3 external
 ```
 
 ---
