@@ -7,24 +7,17 @@
 
 An open-source implementation of Generative Value Learning for robotics and beyond.
 
-<!-- Header Banner (4x2 grid as a single image). Replace with your exported banner image. -->
 <p align="center">
   <img src="assets/header/opengvl_header_4x2.png" alt="OpenGVL Header Grid (4x2)" width="100%">
 </p>
 
-`#message to copilot: add here smething like this below but make if nicer `
-```
-<table>
-  <tr>
-    <td align="center"><a href="#quick-start">Quick Start</a></td>
-    <td align="center"><a href="#getting-started">Getting Started</a></td>
-    <td align="center"><a href="#extending-opengvl">Extending OpenGVL</a></td>
-    <td align="center"><a href="#evaluation">Evaluation</a></td>
-  </tr>
-</table>
-
-```
-
+<div align="center">
+  <a href="#quick-start">🚀 Quick Start</a> •
+  <a href="#getting-started">🧰 Getting Started</a> •
+  <a href="#configuration-hydra">⚙️ Configuration</a> •
+  <a href="#extending-opengvl">🧩 Extending</a> •
+  <a href="#evaluation">📊 Evaluation</a>
+</div>
 
 ---
 
@@ -62,7 +55,7 @@ OpenGVL provides a benchmark and toolkit to evaluate how well vision-language mo
 OpenGVL exposes a simple, unified interface across VLMs and data sources, making it a solid foundation for research and practical deployments of Generative Value Learning in robotics and related domains.
 
 ### Why OpenGVL?
-- Evaluate temporal understanding of VLMs with a principled metrics (Value-Order Correlation, VOC).
+- Evaluate temporal understanding of VLMs with a principled metric (Value-Order Correlation, VOC).
 - Curate datasets at scale by estimating per-frame task completion.
 - Standardize prompts, images, and outputs across multiple models and datasets.
 
@@ -86,54 +79,48 @@ OpenGVL exposes a simple, unified interface across VLMs and data sources, making
 - Prompts: configurable prompt templates for concise or detailed instructions
 
 ### Architecture Overview
-`MESSage to copilot: ok it is nice but make it more readable, it should have better structure because now it is like a loooong pipe`
+
 ```mermaid
-flowchart LR
-  %% High-level, fancy overview of the OpenGVL pipeline
+flowchart TB
+  %% High-level overview of the OpenGVL pipeline (top-down for readability)
 
-  %% Stages
-  subgraph S0["🔧 User Config (Hydra)"]
-    C1["models • prompts • datasets • loaders • experiments"]
+  subgraph S0["🔧 Config (Hydra)"]
+    C1["models • prompts • datasets • loaders • experiment settings"]
   end
 
-  subgraph S1["🗂️ Data & Context"]
-    D1["Load evaluation episodes (frames)"]
-    D2["Optional few-shot context (ordered)"]
+  subgraph S1["🗂️ Data Assembly"]
+    D1["Evaluation episode (shuffled frames)"]
+    D2["Optional context episodes (ordered, known % )"]
   end
 
-  subgraph S2["🧠 VLM Inference"]
-    I1["Compose prompt + attach frames"]
-    I2["VLM API (Gemini • GPT • Gemma • Kimi)"]
+  subgraph S2["🧠 Inference"]
+    I1["Compose prompt (template + phrases + dataset instruction)"]
+    I2["Attach frames (eval + optional context)"]
+    I3["VLM API client (Gemini • GPT • Gemma • Kimi)"]
   end
 
-  subgraph S3["📈 Scoring & Reporting"]
-    E1["Parse completion % per frame"]
-    E2["VOC (temporal order correlation)"]
-    E3["Results & Artifacts (jsonl • plots • logs)"]
+  subgraph S3["📈 Scoring & Artifacts"]
+    E1["Parse per-frame completion %"]
+    E2["Compute VOC (temporal order correlation)"]
+    E3["Save predictions.jsonl + logs + plots"]
   end
 
-  %% Flow
   C1 --> D1
-  C1 -. config hints .-> D2
+  C1 -. optional config .-> D2
   D1 --> I1
   D2 --> I1
-  I1 --> I2
-  I2 --> E1
-  E1 --> E2
-  E2 --> E3
+  I1 --> I2 --> I3 --> E1 --> E2 --> E3
 
-  %% Optional/Infra
-  K1([🔑 .env API keys]) -.-> I2
-  K2([📦 Apptainer/Singularity]) -. reproducible runs .-> I2
-  K3([💾 Cache/Local data]) -.-> D1
+  K1([🔑 .env API keys]) -.-> I3
+  K2([📦 Apptainer/Singularity]) -. reproducible runs .-> I3
+  K3([💾 Local cache / HF datasets]) -.-> D1
 
-  %% Styles
-  style S0 fill:#0ea5e9,stroke:#0284c7,stroke-width:2px,color:#ffffff
-  style S1 fill:#10b981,stroke:#059669,stroke-width:2px,color:#ffffff
-  style S2 fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#ffffff
-  style S3 fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#111827
+  style S0 fill:#0ea5e9,stroke:#0284c7,color:#fff,stroke-width:2px
+  style S1 fill:#10b981,stroke:#059669,color:#fff,stroke-width:2px
+  style S2 fill:#8b5cf6,stroke:#7c3aed,color:#fff,stroke-width:2px
+  style S3 fill:#f59e0b,stroke:#d97706,color:#111827,stroke-width:2px
 
-  classDef optional fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray: 5 5,color:#111827
+  classDef optional fill:#f3f4f6,stroke:#9ca3af,color:#111827,stroke-dasharray: 5 5
   class K1,K2,K3 optional
 ```
 
@@ -141,13 +128,17 @@ flowchart LR
 
 ## Quick Start
 
-After setup (see Getting Started), run a prediction from the [config file](configs/experiments/predict.yaml)
+After setup (see Getting Started), run a prediction using the experiment config at `configs/experiments/predict.yaml`:
 
 ```bash
- HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict
+HYDRA_FULL_ERROR=1 PYTHONPATH=. uv run python3 -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict
 ```
 
 Results are saved under `outputs/DATE_TIME/` with predictions, raw outputs, and metrics.
+
+Tip: you can override any config at the CLI, e.g. `model.temperature=0.5`.
 
 ---
 
@@ -173,16 +164,30 @@ Results are saved under `outputs/DATE_TIME/` with predictions, raw outputs, and 
     ```bash
     python -m venv .venv
     source .venv/bin/activate
+    pip install . # optionally -e for dev
     ```
 
-
 ### Environment Variables
-Create a `.env` file in the project root `cp .env.example .env` then edit with your credentials.
+Create a `.env` file in the project root:
+```bash
+cp .env.example .env
+```
+Then edit `.env` with your credentials:
+```
+OPENAI_API_KEY="your-openai-api-key"
+GOOGLE_API_KEY="your-google-api-key"
+HUGGING_FACE_HUB_TOKEN="your-hugging-face-token"
+```
+- OpenAI API key: for OpenAI GPT models
+- Google API key: for Gemini
+- Hugging Face Hub token: for gated models/datasets
+
+---
 
 ## VLM Input, Output, and Few-Shot Learning
 
 Each prediction uses:
-1) A prompt constructed from a template (e.g., `configs/prompts/concise.yaml`) plus dataset-specific instructions.  
+1) A prompt constructed from a template (e.g., `configs/prompts/concise.yaml`) plus dataset-specific instructions.
    Example instruction: “Task: Pick up the blue block and place it in the red bowl. Estimate task completion (0–100%) per frame. Frames can be shuffled.”
 2) A set of images:
    - Evaluation episode: shuffled frames to estimate completion.
@@ -190,6 +195,7 @@ Each prediction uses:
 
 The VLM returns a text response with per-frame percentages. `extract_percentages()` in `opengvl/utils/inference.py` parses the string into a list of integers, e.g., “Frame 1: 50%, Frame 2: 100%, Frame 3: 25%” → `[50, 100, 25]`.
 
+---
 
 ## Running with Apptainer/Singularity
 
@@ -206,13 +212,9 @@ apptainer build opengvl.sif apptainer/opengvl.def
 
 Run the quick start prediction with GPU:
 ```bash
-export GEM
-export HUGGING_FACE_HUB_TOKEN="your-token"
-
-apptainer run --nv opengvl.sif python opengvl/scripts/predict.py \
-  model=gemini \
-  dataset=berkeleymvp \
-  data_loader=huggingface
+apptainer run --nv opengvl.sif python -m opengvl.scripts.predict \
+  --config-dir configs/experiments \
+  --config-name predict
 ```
 
 Tip: pass environment via `--env` flags or export them in your shell prior to `apptainer run`.
@@ -226,14 +228,16 @@ Configuration lives in `configs/`:
 - `configs/dataset/`: dataset configs
 - `configs/data_loader/`: data loader configs (e.g., `huggingface.yaml`, `local.yaml`)
 - `configs/prompts/`: prompt styles
-- `configs/experiments/`: complete experiment presets
+- `configs/experiments/`: complete experiment presets (e.g., `predict.yaml`)
 
-Override parameters from the command line. Example:
+Override parameters from the command line. Examples:
 ```bash
-# message to copilot - this must be upgraded see how to config look like
-python opengvl/scripts/predict.py \
-  model=gemini dataset=berkeleymvp data_loader=huggingface \
-  model.temperature=0.5
+# Run with explicit experiment config
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict
+
+# Override individual fields
+PYTHONPATH=. uv run python3 -m opengvl.scripts.predict --config-dir configs/experiments --config-name predict \
+  model=gemini dataset=berkeleymvp data_loader=huggingface model.temperature=0.5
 ```
 
 ---
@@ -320,7 +324,7 @@ python opengvl/scripts/predict.py \
 
 ## Contributing
 
-Contributions are welcome!  
+Contributions are welcome!
 - Report bugs or request features via GitHub issues.
 - Open pull requests for fixes and enhancements.
 - For substantial changes, please discuss via an issue first and keep PRs focused and well-tested.
