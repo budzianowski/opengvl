@@ -38,7 +38,6 @@ Generative Value Learning for data curation.
     - [Adding a New Model](#adding-a-new-model)
     - [Adding a New Dataset](#adding-a-new-dataset)
     - [Modifying Prompts (Templates and Phrases)](#modifying-prompts-templates-and-phrases)
-  - [Repository Structure](#repository-structure)
   - [Known Issues \& Troubleshooting](#known-issues--troubleshooting)
   - [Contributing](#contributing)
   - [Citation](#citation)
