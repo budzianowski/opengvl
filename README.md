@@ -409,11 +409,14 @@ Suggested checklist:
 If you use OpenGVL in your research, please cite:
 
 ```bibtex
-@article{opengvl2025,
-  title={OpenGVL: Benchmarking Visual Temporal Progress for Data Curation},
-  author={{Paweł Budzianowski, Emilia Wiśnios, Gracjan Góral, Igor Kulakov, Viktor Petrenko, Krzysztof Walas}},
-  journal={arXiv preprint arXiv:2509.22501},
-  year={2025}
+@misc{budzianowski2025opengvlbenchmarkingvisual,
+      title={OpenGVL - Benchmarking Visual Temporal Progress for Data Curation}, 
+      author={Paweł Budzianowski and Emilia Wiśnios and Gracjan Góral and Igor Kulakov and Viktor Petrenko and Krzysztof Walas},
+      year={2025},
+      eprint={2509.17321},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2509.17321}, 
 }
 ```
 
