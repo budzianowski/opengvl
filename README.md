@@ -4,7 +4,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)]((https://arxiv.org/html/2509.17321v1))
 
 <p align="center">
-  <img src="logo2.png" alt="OpenGVL Header Grid (4x2)" width="40%">
+  <img src="logo2.png" alt="OpenGVL Header Grid (4x2)" width="70%">
 </p>
 
 <div align="center">
