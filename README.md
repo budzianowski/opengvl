@@ -4,7 +4,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)]((https://arxiv.org/html/2509.17321v1))
 
 <p align="center">
-  <img src="logo2.png" alt="OpenGVL Header Grid (4x2)" width="70%">
+  <img src="images/logo3.png" alt="OpenGVL Header Grid (4x2)" width="70%">
 </p>
 
 <div align="center">
@@ -17,12 +17,10 @@
 
 ---
 
-- [OpenGVL: Open Generative Value Learning](#opengvl-open-generative-value-learning)
+- [OpenGVL: Benchmarking Visual Temporal Progress for Data Curation](#opengvl-benchmarking-visual-temporal-progress-for-data-curation)
   - [About](#about)
     - [Why OpenGVL?](#why-opengvl)
     - [How it works (high level)](#how-it-works-high-level)
-    - [Key Features](#key-features)
-    - [Supported Models and Data Sources](#supported-models-and-data-sources)
     - [Architecture Overview](#architecture-overview)
   - [Quick Start](#quick-start)
   - [Getting Started](#getting-started)
