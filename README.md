@@ -1,9 +1,7 @@
 # OpenGVL: Benchmarking Visual Temporal Progress for Data Curation
-
-[![PyPI version](https://badge.fury.io/py/gvl.svg)](https://badge.fury.io/py/gvl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/budzianowski/opengvl)
-[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)](TODO)
+[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)]((https://arxiv.org/html/2509.17321v1))
 
 Generative Value Learning for data curation.
 
