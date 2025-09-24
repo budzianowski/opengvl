@@ -21,6 +21,7 @@ build/
 wheels/
 experimental/
 outputs/
+multirun/
 # IPython Notebook checkpoints
 .ipynb_checkpoints
 

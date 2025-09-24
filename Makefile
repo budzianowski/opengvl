@@ -19,33 +19,33 @@ lint:
 
 # Run tests
 test:
-	python -m pytest tests/ -v
+	uv run python3 -m pytest tests/ -v
 
 # Run tests with coverage report
 test-coverage:
-	python -m pytest tests/ -v --cov=opengvl --cov-report=term-missing --cov-report=html
+	uv run python3 -m pytest tests/ -v --cov=opengvl --cov-report=term-missing --cov-report=html
 
 # Run tests quickly (no verbose output)
 test-fast:
-	python -m pytest tests/ -q
+	uv run python3 -m pytest tests/ -q
 
 # Run tests with extra verbose output and show local variables on failure
 test-verbose:
-	python -m pytest tests/ -vvv --tb=long
+	uv run python3 -m pytest tests/ -vvv --tb=long
 
 # Run specific test file or pattern
 # Usage: make test-specific TEST=test_voc_metric.py
 # Usage: make test-specific TEST="test_data_types.py::TestEpisode"
 test-specific:
-	python -m pytest tests/$(TEST) -v
+	uv run python3 -m pytest tests/$(TEST) -v
 
 # Run tests and generate XML report for CI
 test-ci:
-	python -m pytest tests/ --junitxml=test-results.xml --cov=opengvl --cov-report=xml
+	uv run python3 -m pytest tests/ --junitxml=test-results.xml --cov=opengvl --cov-report=xml
 
 # Run tests in parallel (requires pytest-xdist)
 test-parallel:
-	python -m pytest tests/ -v -n auto
+	uv run python3 -m pytest tests/ -v -n auto
 
 # Clean up
 clean:
