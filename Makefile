@@ -2,7 +2,7 @@
 
 # Install dependencies
 install:
-	uv sync
+	uv run python3 -c "print('dependencies installed!')"
 
 # Format code
 format:

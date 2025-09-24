@@ -10,7 +10,7 @@ license = { file = "LICENSE" }
 requires-python = ">=3.11"
 dependencies = [
     "accelerate>=1.8.1",
-    "datasets>=2.19.0,<=3.6.0",
+    "datasets>=2.19.0",
     "dotenv>=0.9.9",
     "google-genai>=1.24.0",
     "google-generativeai>=0.8.5",
