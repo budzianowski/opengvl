@@ -90,12 +90,13 @@ select = [
     "TRY",
 ]
 ignore = [
-    # Long exception messages outside class definitions (not useful for this project)
+    # Long exception messages outside class definitions 
     "TRY003",
+    # Abstract `raise` to an inner functionRuff 
+    "TRY301",
     # Don't force wrapping single raise statements into helper functions
     "TRY301",
     # Allow broad exception catching in tests / integration scaffolding if present
-    # (Remove if you later want stricter error handling)
     # "TRY002",
 ]
 

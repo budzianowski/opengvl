@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import numpy as np
 from loguru import logger
 from scipy.stats import spearmanr
@@ -9,7 +7,6 @@ from opengvl.metrics.base import Metric, MetricResult
 from opengvl.utils.data_types import InferredFewShotResult
 
 
-@dataclass
 class VOCMetric(Metric):
     """Value-Order Correlation (VOC) as Spearman correlation between predicted
     completion percentages (reordered into chronological order) and their index.
