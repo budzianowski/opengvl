@@ -21,9 +21,6 @@ lint:
 test:
 	uv run python3 -m pytest tests/ -v
 
-# Run tests with coverage report
-test-coverage:
-	uv run python3 -m pytest tests/ -v --cov=opengvl --cov-report=term-missing --cov-report=html
 
 # Run tests quickly (no verbose output)
 test-fast:
