@@ -51,8 +51,8 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py39"
-line-length = 120
+target-version = "py311"
+line-length = 160
 fix = true
 
 
@@ -97,18 +97,22 @@ ignore = [
     # Don't force wrapping single raise statements into helper functions
     "TRY301",
     # Allow broad exception catching in tests / integration scaffolding if present
-    # "TRY002",
+    "TRY002",
+    "C901",
+    "UP038",
+    "S112",
 ]
 
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "S603"]
+"notebooks/*.ipynb" = ["F"]  # Ignore pyflakes typing/name checks inside notebooks
 
 [tool.ruff.lint.isort]
 required-imports = []
 
 [tool.black]
-line-length = 120
+line-length = 160
 
 [tool.uv.sources]
 lerobot = { git = "https://github.com/huggingface/lerobot.git", rev = "main" }

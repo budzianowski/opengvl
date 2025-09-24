@@ -188,9 +188,7 @@ class TestBaseDataLoaderHelpers:
             original_frames_task_completion_rates=original_rates,
             shuffled_frames_indices=shuffled_indices,
             shuffled_frames=[dummy_image] * num_frames,
-            shuffled_frames_approx_completion_rates=[
-                original_rates[original_indices.index(idx)] for idx in shuffled_indices
-            ],
+            shuffled_frames_approx_completion_rates=[original_rates[original_indices.index(idx)] for idx in shuffled_indices],
         )
 
         # Verify episode is valid
@@ -242,7 +240,6 @@ class TestBaseDataLoaderHelpers:
 
     def test_frame_shuffling_preserves_data(self):
         """Test that frame shuffling preserves data integrity."""
-        dummy_image = np.zeros((64, 64, 3), dtype=np.uint8)
 
         # Original data
         original_indices = [0, 1, 2, 3, 4]
@@ -254,7 +251,6 @@ class TestBaseDataLoaderHelpers:
         rng.shuffle(shuffled_indices)
 
         # Create corresponding shuffled data
-        shuffled_frames = [dummy_image] * len(shuffled_indices)
         shuffled_rates = [original_rates[original_indices.index(idx)] for idx in shuffled_indices]
 
         # Verify data integrity

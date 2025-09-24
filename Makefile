@@ -62,6 +62,10 @@ clean:
 pyright:
 	uv run pyright opengvl
 
+# Run pylint (static analysis using .pylintrc). Does not fail the build by default; remove '|| true' to enforce.
+pylint:
+	uv run pylint opengvl tests --rcfile=.pylintrc
+
 # Show help
 help:
 	@echo "Available commands:"
@@ -77,4 +81,5 @@ help:
 	@echo "  test-parallel  - Run tests in parallel (requires pytest-xdist)"
 	@echo "  clean          - Clean up generated files"
 	@echo "  pyright        - Run type checking"
+	@echo "  pylint         - Run pylint static analysis (non-fatal)"
 	@echo "  help           - Show this help message"

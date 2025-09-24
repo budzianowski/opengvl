@@ -72,7 +72,7 @@ def extract_percentages(
     scale = 100.0 / total
     scaled = [v * scale for v in vals]
     floors = [math.floor(x) for x in scaled]
-    remainders = [x - f for x, f in zip(scaled, floors)]
+    remainders = [x - f for x, f in zip(scaled, floors, strict=True)]
     current_sum = sum(floors)
     need = int(100 - current_sum)
 
@@ -145,9 +145,7 @@ def predict_on_fewshot_input(
 
     The logic mirrors the original script function without changes.
     """
-    logger.info(
-        f"Processing example {idx + 1}/{total} (episode_index={ex.eval_episode.episode_index}) from {dataset_name}"
-    )
+    logger.info(f"Processing example {idx + 1}/{total} (episode_index={ex.eval_episode.episode_index}) from {dataset_name}")
     prompt = format_prompt(prompt_template, instruction=ex.eval_episode.instruction)
     logger.debug(f"Prompt (truncated {N_DEBUG_PROMPT_CHARS} chars): {prompt[:N_DEBUG_PROMPT_CHARS]}...")
     try:
@@ -179,11 +177,7 @@ def predict_on_fewshot_input(
         for k, v in metric_res.details.items():
             metrics_payload[f"{metric_res.name}_{k}"] = v
 
-    logger.debug(
-        f"Metrics example {idx}: {metric_res.name}="
-        f"{(metric_res.value if metric_res.value is not None else float('nan')):.4f}"
-        f"{(' details=' + str(metric_res.details)) if metric_res.details else ''}"
-    )
+    logger.debug(f"Metrics example {idx}: {metric_res.name}={metric_res.value:.4f}{(' details=' + str(metric_res.details)) if metric_res.details else ''}")
 
     record = PredictionRecord(
         index=idx,

@@ -1,10 +1,7 @@
 import numpy as np
 import pytest
 
-from opengvl.utils.constants import (
-    MAX_TOKENS_TO_GENERATE,
-    N_DEBUG_PROMPT_CHARS,
-)
+from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE, N_DEBUG_PROMPT_CHARS
 
 
 class TestConstants:

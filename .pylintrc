@@ -1,6 +1,7 @@
 [MASTER]
 # Ignore virtualenv directories
 ignore=.venv,venv
+py-version=3.11
 
 [MESSAGES CONTROL]
 # Disable warnings that are intentionally tolerated in tests and adapters
@@ -8,7 +9,8 @@ disable=
     protected-access,
     missing-module-docstring,
     missing-class-docstring,
-    missing-function-docstring
+    missing-function-docstring,
+    no-member
 
 # Additional non-critical messages often noisy in tests, examples, and adapters
 # - invalid-name: allow test/helper names that don't follow strict style
@@ -30,7 +32,7 @@ disable=
     ,import-error
 
 [FORMAT]
-max-line-length=100
+max-line-length=160
 
 [REPORTS]
 output-format=colorized

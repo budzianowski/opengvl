@@ -59,7 +59,7 @@ class TestExtractPercentages:
 
             normalized = [v * 100.0 / total for v in vals]
             floors = [int(v) for v in normalized]
-            remainders = [v - f for v, f in zip(normalized, floors)]
+            remainders = [v - f for v, f in zip(normalized, floors, strict=False)]
 
             current_sum = sum(floors)
             need = int(100 - current_sum)
@@ -102,7 +102,7 @@ class TestExtractPercentages:
 
             normalized = [v * 100.0 / total for v in vals]
             floors = [int(v) for v in normalized]
-            remainders = [v - f for v, f in zip(normalized, floors)]
+            remainders = [v - f for v, f in zip(normalized, floors, strict=False)]
 
             current_sum = sum(floors)
             need = int(100 - current_sum)
@@ -266,7 +266,7 @@ class TestInferenceIntegration:
 
             normalized = [v * 100.0 / total for v in vals]
             floors = [int(v) for v in normalized]
-            remainders = [v - f for v, f in zip(normalized, floors)]
+            remainders = [v - f for v, f in zip(normalized, floors, strict=False)]
 
             current_sum = sum(floors)
             need = int(100 - current_sum)

@@ -2,11 +2,7 @@ import numpy as np
 import pytest
 
 from opengvl.utils.data_types import Episode, Example, InferredEpisode, InferredFewShotResult
-from opengvl.utils.errors import (
-    OriginalFramesLengthMismatch,
-    ShuffledFramesIndicesNotSubset,
-    ShuffledFramesLengthMismatch,
-)
+from opengvl.utils.errors import OriginalFramesLengthMismatch, ShuffledFramesIndicesNotSubset, ShuffledFramesLengthMismatch
 
 
 class TestEpisode:

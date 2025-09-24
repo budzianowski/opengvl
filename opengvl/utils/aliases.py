@@ -39,9 +39,11 @@ EncodedImage: TypeAlias = bytes
 class Event:
     """Marker base for prompt events."""
 
+
 @dataclass(frozen=True)
 class TextEvent(Event):
     text: str
+
 
 @dataclass(frozen=True)
 class ImageEvent(Event):
