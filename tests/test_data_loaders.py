@@ -21,7 +21,7 @@ class TestBaseDataLoader:
         loader = MockDataLoader()
         assert loader.num_frames == 10
         assert loader.num_context_episodes == 0
-        assert loader.shuffle
+        assert loader.shuffle is False
         assert loader.seed == 42
         assert loader._rng is not None
 

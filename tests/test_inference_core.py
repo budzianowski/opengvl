@@ -16,8 +16,8 @@ sys.modules["openai"] = Mock()
 sys.modules["transformers"] = Mock()
 sys.modules["torch"] = Mock()
 
-from opengvl.utils.data_types import Episode, Example, InferredFewShotResult
-from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError
+from opengvl.utils.data_types import Episode, Example, InferredFewShotResult  # noqa: E402
+from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError  # noqa: E402
 
 
 class TestExtractPercentages:
