@@ -1,8 +1,7 @@
 import numpy as np
-import pytest
 
 from opengvl.metrics.voc import VOCMetric
-from opengvl.utils.data_types import InferredFewShotResult, InferredEpisode, Episode
+from opengvl.utils.data_types import InferredEpisode, InferredFewShotResult
 
 
 def create_test_episode(
@@ -14,12 +13,12 @@ def create_test_episode(
     """Helper to create test episode data."""
     # Create dummy image arrays
     dummy_image = np.zeros((64, 64, 3), dtype=np.uint8)
-    
+
     # Create episode with proper data structure
     original_indices = sorted(shuffled_indices)
     original_rates = [i * 10 for i in range(len(original_indices))]  # Linear progression
     approx_rates = [original_rates[original_indices.index(idx)] for idx in shuffled_indices]
-    
+
     return InferredEpisode(
         instruction=instruction,
         starting_frame=dummy_image,
@@ -55,13 +54,13 @@ class TestVOCMetric:
         # Expected chronological order: [0, 1, 2, 3] with indices [0, 25, 50, 75]
         episode = create_test_episode(
             shuffled_indices=[2, 0, 1, 3],
-            predicted_rates=[50, 0, 25, 75]  # When reordered chronologically: [0, 25, 50, 75]
+            predicted_rates=[50, 0, 25, 75],  # When reordered chronologically: [0, 25, 50, 75]
         )
         result = create_test_result(episode)
-        
+
         metric = VOCMetric()
         metric_result = metric.compute(result)
-        
+
         assert metric_result.name == "voc"
         assert np.isclose(metric_result.value, 1.0, atol=1e-10)
 
@@ -69,13 +68,13 @@ class TestVOCMetric:
         """Test perfect negative correlation case."""
         episode = create_test_episode(
             shuffled_indices=[0, 1, 2, 3],
-            predicted_rates=[75, 50, 25, 0]  # Decreasing when chronologically ordered
+            predicted_rates=[75, 50, 25, 0],  # Decreasing when chronologically ordered
         )
         result = create_test_result(episode)
-        
+
         metric = VOCMetric()
         metric_result = metric.compute(result)
-        
+
         assert metric_result.name == "voc"
         assert np.isclose(metric_result.value, -1.0, atol=1e-10)
 
@@ -83,28 +82,25 @@ class TestVOCMetric:
         """Test that constant predictions return score of 0."""
         episode = create_test_episode(
             shuffled_indices=[0, 1, 2, 3],
-            predicted_rates=[50, 50, 50, 50]  # All same value
+            predicted_rates=[50, 50, 50, 50],  # All same value
         )
         result = create_test_result(episode)
-        
+
         metric = VOCMetric()
         metric_result = metric.compute(result)
-        
+
         assert metric_result.name == "voc"
         assert metric_result.value == 0.0
         assert metric_result.details["note"] == "constant predictions"
 
     def test_insufficient_length(self):
         """Test that single frame episodes return score of 0."""
-        episode = create_test_episode(
-            shuffled_indices=[0],
-            predicted_rates=[50]
-        )
+        episode = create_test_episode(shuffled_indices=[0], predicted_rates=[50])
         result = create_test_result(episode)
-        
+
         metric = VOCMetric()
         metric_result = metric.compute(result)
-        
+
         assert metric_result.name == "voc"
         assert metric_result.value == 0.0
         assert metric_result.details["note"] == "insufficient length"
@@ -114,13 +110,13 @@ class TestVOCMetric:
         # Create a case with partial correlation
         episode = create_test_episode(
             shuffled_indices=[0, 1, 2, 3, 4],
-            predicted_rates=[0, 25, 100, 50, 75]  # Mixed order when chronologically arranged
+            predicted_rates=[0, 25, 100, 50, 75],  # Mixed order when chronologically arranged
         )
         result = create_test_result(episode)
-        
+
         metric = VOCMetric()
         metric_result = metric.compute(result)
-        
+
         assert metric_result.name == "voc"
         assert -1.0 <= metric_result.value <= 1.0  # Should be valid correlation
 
@@ -129,31 +125,25 @@ class TestVOCMetric:
         np.random.seed(42)
         shuffled_indices = [0, 1, 2, 3, 4, 5]
         predicted_rates = [30, 60, 10, 90, 40, 70]
-        
-        episode = create_test_episode(
-            shuffled_indices=shuffled_indices,
-            predicted_rates=predicted_rates
-        )
+
+        episode = create_test_episode(shuffled_indices=shuffled_indices, predicted_rates=predicted_rates)
         result = create_test_result(episode)
-        
+
         metric = VOCMetric()
         metric_result = metric.compute(result)
-        
+
         assert metric_result.name == "voc"
         assert -1.0 <= metric_result.value <= 1.0
         assert not np.isnan(metric_result.value)
 
     def test_empty_episodes(self):
         """Test handling of empty episodes."""
-        episode = create_test_episode(
-            shuffled_indices=[],
-            predicted_rates=[]
-        )
+        episode = create_test_episode(shuffled_indices=[], predicted_rates=[])
         result = create_test_result(episode)
-        
+
         metric = VOCMetric()
         metric_result = metric.compute(result)
-        
+
         assert metric_result.name == "voc"
         assert metric_result.value == 0.0
         assert metric_result.details["note"] == "insufficient length"

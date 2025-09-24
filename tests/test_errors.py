@@ -1,15 +1,14 @@
 import pytest
-import numpy as np
 
 from opengvl.utils.errors import (
     ImageEncodingError,
+    InputTooLongError,
+    MaxRetriesExceeded,
     OriginalFramesLengthMismatch,
-    ShuffledFramesLengthMismatch,
-    ShuffledFramesIndicesNotSubset,
     PercentagesCountMismatch,
     PercentagesNormalizationError,
-    MaxRetriesExceeded,
-    InputTooLongError,
+    ShuffledFramesIndicesNotSubset,
+    ShuffledFramesLengthMismatch,
 )
 
 
@@ -56,7 +55,9 @@ class TestShuffledFramesLengthMismatch:
     def test_error_message(self):
         """Test error message formatting."""
         error = ShuffledFramesLengthMismatch(4, 3, 4)
-        expected = "shuffled_frames_indices (4), shuffled_frames (3), shuffled_frames_approx_completion_rates (4) must be 1:1"
+        expected = (
+            "shuffled_frames_indices (4), shuffled_frames (3), shuffled_frames_approx_completion_rates (4) must be 1:1"
+        )
         assert str(error) == expected
 
 
@@ -160,6 +161,7 @@ class TestErrorUsagePatterns:
 
     def test_error_context_manager(self):
         """Test using errors in context managers."""
+
         def might_fail(should_fail=False):
             if should_fail:
                 raise PercentagesCountMismatch(5, 3)
@@ -178,7 +180,7 @@ class TestErrorUsagePatterns:
         expected = 10
         found = 5
         error = PercentagesCountMismatch(expected, found)
-        
+
         # Test that error contains expected values
         error_str = str(error)
         assert str(expected) in error_str

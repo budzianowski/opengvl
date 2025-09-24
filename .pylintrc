@@ -1,0 +1,37 @@
+[MASTER]
+# Ignore virtualenv directories
+ignore=.venv,venv
+
+[MESSAGES CONTROL]
+# Disable warnings that are intentionally tolerated in tests and adapters
+disable=
+    protected-access,
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring
+
+# Additional non-critical messages often noisy in tests, examples, and adapters
+# - invalid-name: allow test/helper names that don't follow strict style
+# - too-few-public-methods: small data-holder classes
+# - no-self-use: methods used by tests but not using self
+# - redefined-outer-name: common in test fixtures
+# - too-many-arguments / too-many-locals: tests and helpers can be verbose
+# - too-many-instance-attributes: simple structs in tests may have many attrs
+# - duplicate-code: test data scaffolding can repeat patterns
+# - import-error: optional dependencies or env-specific imports in dev
+    ,invalid-name
+    ,too-few-public-methods
+    ,no-self-use
+    ,redefined-outer-name
+    ,too-many-arguments
+    ,too-many-locals
+    ,too-many-instance-attributes
+    ,duplicate-code
+    ,import-error
+
+[FORMAT]
+max-line-length=100
+
+[REPORTS]
+output-format=colorized
+score=no
