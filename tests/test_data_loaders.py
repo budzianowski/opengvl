@@ -123,7 +123,7 @@ class TestBaseDataLoader:
     def test_abstract_method_enforcement(self):
         """Test that BaseDataLoader cannot be instantiated directly."""
         with pytest.raises(TypeError):
-            BaseDataLoader()  # type: ignore
+            BaseDataLoader()  # pyright: ignore[reportAbstractUsage]
 
     def test_rng_deterministic_behavior(self):
         """Test that RNG produces deterministic results with same seed."""

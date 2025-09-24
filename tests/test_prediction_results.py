@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 
 from opengvl.results.prediction import DatasetMetrics, PredictionRecord, aggregate_metrics
@@ -7,10 +9,10 @@ from opengvl.utils.data_types import Episode, InferredEpisode, InferredFewShotRe
 def create_test_prediction_record(
     index: int = 0,
     dataset: str = "test_dataset",
-    predicted_percentages: list[int] = None,
+    predicted_percentages: list[int] | None = None,
     valid_length: bool = True,
-    metrics: dict = None,
-    raw_response: str = None,
+    metrics: dict[str, Any] | None = None,
+    raw_response: str | None = None,
 ) -> PredictionRecord:
     """Helper to create test prediction records."""
     if predicted_percentages is None:
@@ -70,7 +72,7 @@ class TestPredictionRecord:
         assert record.index == 0
         assert record.dataset == "test_dataset"
         assert record.predicted_percentages == [25, 50, 75]
-        assert record.valid_length == True
+        assert record.valid_length
         assert record.metrics == {"voc": 0.8}
         assert record.raw_response is None
 
@@ -95,7 +97,7 @@ class TestPredictionRecord:
         assert result_dict["index"] == 5
         assert result_dict["dataset"] == "test_data"
         assert result_dict["predicted_percentages"] == [10, 40, 50]
-        assert result_dict["valid_length"] == True
+        assert result_dict["valid_length"]
         assert result_dict["metrics"] == {"voc": 0.9, "custom": 1.2}
 
         # Check eval episode structure
@@ -120,7 +122,7 @@ class TestPredictionRecord:
         result_dict = record.to_dict(include_images=True)
 
         # Should include images flag
-        assert result_dict["eval_episode"]["_frames_present"] == True
+        assert result_dict["eval_episode"]["_frames_present"]
 
     def test_to_dict_with_raw_response(self):
         """Test serialization includes raw response when present."""
@@ -392,11 +394,11 @@ class TestPredictionRecordIntegration:
         assert serialized["index"] == 42
         assert serialized["dataset"] == "integration_test"
         assert serialized["predicted_percentages"] == [15, 35, 50]
-        assert serialized["valid_length"] == True
+        assert serialized["valid_length"]
         assert serialized["metrics"]["voc"] == 0.95
         assert serialized["metrics"]["custom_metric"] == 1.23
         assert serialized["raw_response"] == "Raw output text"
-        assert serialized["eval_episode"]["_frames_present"] == True
+        assert serialized["eval_episode"]["_frames_present"]
 
     def test_batch_processing_workflow(self):
         """Test typical batch processing workflow."""
@@ -417,7 +419,7 @@ class TestPredictionRecordIntegration:
 
         assert aggregated.total_examples == 5
         assert aggregated.valid_predictions == 3  # Records 0, 2, 4
-        assert abs(aggregated.length_valid_ratio - 0.6) < 1e-10
+        assert aggregated.length_valid_ratio is not None and abs(aggregated.length_valid_ratio - 0.6) < 1e-10
 
         # Average VOC should be (0.5 + 0.6 + 0.7 + 0.8 + 0.9) / 5 = 0.7
         assert abs(aggregated.metric_means["voc"] - 0.7) < 1e-10
