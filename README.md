@@ -7,12 +7,15 @@
   <img src="images/logo3.png" alt="OpenGVL Header Grid (4x2)" width="70%">
 </p>
 
+<p align="center">
+  <a href="https://huggingface.co/spaces/OpenGVL/OpenGVL"><b> Live Benchmark on Hugging Face Spaces</b></a>
+</p>
+
 <div align="center">
-  <a href="#quick-start">🚀 Quick Start</a> •
+  <a href="#quick-start"> Quick Start</a> •
   <a href="#getting-started">🧰 Getting Started</a> •
   <a href="#configuration-hydra">⚙️ Configuration</a> •
-  <a href="#extending-opengvl">🧩 Extending</a> •
-  <a href="#evaluation">📊 Evaluation</a>
+  <a href="#extending-opengvl">🧩 Extending</a>
 </div>
 
 ---
