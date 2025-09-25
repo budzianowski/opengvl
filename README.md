@@ -1,7 +1,7 @@
 # OpenGVL: Benchmarking Visual Temporal Progress for Data Curation
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/budzianowski/opengvl)
-[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)]((https://arxiv.org/html/2509.17321v1))
+[![arXiv](https://img.shields.io/badge/arXiv-2509.17321-b31b1b.svg)]((https://arxiv.org/html/2509.17321v1))
 
 <p align="center">
   <img src="images/logo3.png" alt="OpenGVL Header Grid (4x2)" width="70%">
@@ -35,7 +35,6 @@
     - [Adding a New Dataset](#adding-a-new-dataset)
     - [Modifying Prompts (Templates and Phrases)](#modifying-prompts-templates-and-phrases)
   - [Known Issues \& Troubleshooting](#known-issues--troubleshooting)
-  - [Contributing](#contributing)
   - [Citation](#citation)
   - [Acknowledgments](#acknowledgments)
   - [License](#license)
@@ -383,20 +382,6 @@ Notes:
 - GPU OOM (CUDA): reduce `batch_size` or image resolution in the model config (e.g., `configs/model/gemini.yaml`).
 - Hugging Face authentication: ensure `HUGGING_FACE_HUB_TOKEN` is set in `.env` for gated models/private datasets.
 - API rate limits: consider lowering concurrency or increasing `TQDM_MININTERVAL` when applicable.
-
----
-
-## Contributing
-
-Contributions are welcome!
-- Report bugs or request features via GitHub issues.
-- Open pull requests for fixes and enhancements.
-- For substantial changes, please discuss via an issue first and keep PRs focused and well-tested.
-
-Suggested checklist:
-- Add/update tests for new functionality.
-- Include/adjust configs under `configs/` as needed.
-- Update documentation and examples where relevant.
 
 ---
 
