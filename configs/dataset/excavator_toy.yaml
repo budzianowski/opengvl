@@ -1,0 +1,6 @@
+name: excavator_toy
+dataset_name: "Mahimana/excavator_toy_v3_dig_dump_v3_51"
+camera_index: 5
+max_episodes: 50
+num_frames: 30
+num_context_episodes: 1

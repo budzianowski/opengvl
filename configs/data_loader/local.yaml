@@ -1,0 +1,9 @@
+_target_: opengvl.data_loaders.local.LocalDataLoader
+
+episodes_files: ${dataset.episodes_files}
+instruction: ${dataset.instruction}
+
+num_frames: ${dataset.num_frames:20}
+num_context_episodes: ${dataset.num_context_episodes:0}
+shuffle: ${shuffle}
+seed: ${seed}

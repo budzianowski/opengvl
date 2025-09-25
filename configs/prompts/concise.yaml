@@ -1,0 +1,2 @@
+template: |
+  Task: {instruction}. Estimate task completion (0-100%) per frame. Frames can be shuffled.

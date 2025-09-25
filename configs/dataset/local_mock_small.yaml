@@ -1,0 +1,5 @@
+name: local_mock_small
+instruction: "Place the red block on the green platform."
+episodes_files:
+  - ["/tmp/episode1/0001.png", "/tmp/episode1/0002.png", "/tmp/episode1/0003.png"]
+  - ["/tmp/episode2/0001.png", "/tmp/episode2/0002.png", "/tmp/episode2/0003.png"]

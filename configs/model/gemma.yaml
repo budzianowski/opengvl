@@ -1,0 +1,2 @@
+_target_: opengvl.clients.gemma.GemmaClient
+model_id: google/gemma-3-4b-it

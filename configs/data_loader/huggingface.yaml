@@ -1,0 +1,9 @@
+_target_: opengvl.data_loaders.huggingface.HuggingFaceDataLoader
+
+dataset_name: ${dataset.dataset_name}
+camera_index: ${dataset.camera_index}
+num_frames: ${dataset.num_frames}
+num_context_episodes: ${dataset.num_context_episodes}
+shuffle: ${shuffle}
+seed: ${seed}
+max_episodes: ${dataset.max_episodes}

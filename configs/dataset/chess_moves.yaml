@@ -1,0 +1,6 @@
+name: chess_moves
+dataset_name: "dopaul/1500_chess_moves"
+camera_index: 0
+max_episodes: 100
+num_frames: 15
+num_context_episodes: 1

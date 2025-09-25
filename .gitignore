@@ -1,0 +1,90 @@
+# =============================================================================
+# Python
+# =============================================================================
+
+# Virtual Environment folder created by Poetry
+# This should always be ignored!
+.venv/
+.env
+# Python caches and compiled files/images
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sif
+
+# Distribution / packaging / hydra
+dist/
+build/
+*.egg-info/
+*.egg
+wheels/
+experimental/
+outputs/
+# IPython Notebook checkpoints
+.ipynb_checkpoints
+
+
+# =============================================================================
+# IDE & Editor Specific: Visual Studio Code
+# =============================================================================
+
+# VS Code specific settings and cache
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Local history for VS Code
+.history/
+
+
+# =============================================================================
+# Data & Machine Learning
+# (Uncomment the lines that apply to you)
+# =============================================================================
+
+# It's highly recommended to ignore large data files.
+# Store them in a separate cloud storage (like S3, GCS) or use Git LFS.
+
+*.csv
+*.json
+*.xml
+*.h5
+*.hdf5
+*.parquet
+*.feather
+
+# Saved models, which can be very large
+
+*.pt
+*.pth
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.keras
+*.tflite
+*.pb
+
+# TensorFlow/Keras logging and output
+logs/
+*.log
+tensorboard/
+
+
+# =============================================================================
+# General Operating System files
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+*.lnk
