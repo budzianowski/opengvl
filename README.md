@@ -1,7 +1,7 @@
 # OpenGVL: Benchmarking Visual Temporal Progress for Data Curation
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/budzianowski/opengvl)
-[![arXiv](https://img.shields.io/badge/arXiv-2411.04549-b31b1b.svg)]((https://arxiv.org/html/2509.17321v1))
+[![arXiv](https://img.shields.io/badge/arXiv-2509.17321-b31b1b.svg)]((https://arxiv.org/html/2509.17321v1))
 
 <p align="center">
   <img src="images/logo3.png" alt="OpenGVL Header Grid (4x2)" width="70%">
@@ -24,7 +24,6 @@
   - [About](#about)
     - [Why OpenGVL?](#why-opengvl)
     - [How it works (high level)](#how-it-works-high-level)
-    - [Architecture Overview](#architecture-overview)
   - [Quick Start](#quick-start)
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
@@ -38,7 +37,6 @@
     - [Adding a New Dataset](#adding-a-new-dataset)
     - [Modifying Prompts (Templates and Phrases)](#modifying-prompts-templates-and-phrases)
   - [Known Issues \& Troubleshooting](#known-issues--troubleshooting)
-  - [Contributing](#contributing)
   - [Citation](#citation)
   - [Acknowledgments](#acknowledgments)
   - [License](#license)
@@ -62,79 +60,6 @@ OpenGVL exposes a simple, unified interface across VLMs and data sources, making
 3. Query a chosen VLM with images + prompt.
 4. Parse the VLM’s textual outputs into per-frame completion percentages.
 5. Compute VOC/metrics against ground truth and save results.
-
-
-### Architecture Overview
-
-```mermaid
-flowchart TB
-  %% Enhanced OpenGVL pipeline with improved UX
-  subgraph S0["⚙️ Configuration Layer"]
-    direction LR
-    C1{{"🔧 Hydra Config<br/>• Models & Prompts<br/>• Datasets & Loaders<br/>• Experiment Settings"}}
-  end
-  
-  subgraph S1["📊 Data Preparation"]
-    direction TB
-    D1[("📹 Evaluation Episode<br/>(Shuffled Frames)")]
-    D2[("🎬 Context Episodes<br/>(Ordered, Known %)")]
-    D1 -.-> D2
-  end
-  
-  subgraph S2["🤖 AI Processing Pipeline"]
-    direction TB
-    I1["✍️ Prompt Composition<br/>Template + Phrases + Instructions"]
-    I2["🖼️ Frame Attachment<br/>Evaluation + Context Frames"]
-    I3{{"🧠 VLM API Gateway<br/>Gemini • GPT-4 • Gemma • Kimi"}}
-    I1 --> I2 --> I3
-  end
-  
-  subgraph S3["📈 Analytics & Output"]
-    direction TB
-    E1["🔍 Frame Completion Parsing<br/>Per-frame % Analysis"]
-    E2["📏 VOC Computation<br/>Temporal Order Correlation"]
-    E3[("💾 Export Results<br/>predictions.jsonl • logs • plots")]
-    E1 --> E2 --> E3
-  end
-  
-  %% External Dependencies
-  K1{{🔐 Environment Keys<br/>.env API Configuration}}
-  K2{{🐳 Containerization<br/>Apptainer/Singularity}}
-  K3{{💽 Data Sources<br/>Local Cache • HF Datasets}}
-  
-  %% Main flow connections
-  C1 ==> D1
-  C1 -.-> D2
-  D1 ==> I1
-  D2 -.-> I1
-  I3 ==> E1
-  
-  %% External connections
-  K1 -.-> I3
-  K2 -.-> S2
-  K3 -.-> D1
-  
-  %% Enhanced styling
-  style S0 fill:#1e3a8a,stroke:#1d4ed8,color:#ffffff,stroke-width:3px,rx:15
-  style S1 fill:#065f46,stroke:#047857,color:#ffffff,stroke-width:3px,rx:15
-  style S2 fill:#581c87,stroke:#7c3aed,color:#ffffff,stroke-width:3px,rx:15
-  style S3 fill:#dc2626,stroke:#ef4444,color:#ffffff,stroke-width:3px,rx:15
-  
-  %% Node styling
-  style C1 fill:#3b82f6,stroke:#2563eb,color:#ffffff,stroke-width:2px
-  style D1 fill:#10b981,stroke:#059669,color:#ffffff,stroke-width:2px
-  style D2 fill:#6ee7b7,stroke:#34d399,color:#111827,stroke-width:2px
-  style I1 fill:#a855f7,stroke:#9333ea,color:#ffffff,stroke-width:2px
-  style I2 fill:#c084fc,stroke:#a855f7,color:#ffffff,stroke-width:2px
-  style I3 fill:#7c3aed,stroke:#6d28d9,color:#ffffff,stroke-width:2px
-  style E1 fill:#f97316,stroke:#ea580c,color:#ffffff,stroke-width:2px
-  style E2 fill:#fb923c,stroke:#f97316,color:#ffffff,stroke-width:2px
-  style E3 fill:#fbbf24,stroke:#f59e0b,color:#111827,stroke-width:2px
-  
-  %% External dependency styling
-  classDef external fill:#f8fafc,stroke:#64748b,color:#475569,stroke-width:2px,stroke-dasharray:8 4
-  class K1,K2,K3 external
-```
 
 ---
 
@@ -386,20 +311,6 @@ Notes:
 - GPU OOM (CUDA): reduce `batch_size` or image resolution in the model config (e.g., `configs/model/gemini.yaml`).
 - Hugging Face authentication: ensure `HUGGING_FACE_HUB_TOKEN` is set in `.env` for gated models/private datasets.
 - API rate limits: consider lowering concurrency or increasing `TQDM_MININTERVAL` when applicable.
-
----
-
-## Contributing
-
-Contributions are welcome!
-- Report bugs or request features via GitHub issues.
-- Open pull requests for fixes and enhancements.
-- For substantial changes, please discuss via an issue first and keep PRs focused and well-tested.
-
-Suggested checklist:
-- Add/update tests for new functionality.
-- Include/adjust configs under `configs/` as needed.
-- Update documentation and examples where relevant.
 
 ---
 
