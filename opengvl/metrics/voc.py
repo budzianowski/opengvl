@@ -15,7 +15,7 @@ def value_order_correlation(
     values: Union[Sequence[float], np.ndarray],
     true_values: Union[Sequence[float], np.ndarray],
 ) -> float:
-    if values is None or true_values is None:  # type: ignore[truthy-bool]
+    if values is None or true_values is None:
         raise ValueError("values and true_values must not be None")
 
     # Convert to numpy arrays (copy not required) with float dtype for safety
