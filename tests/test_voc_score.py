@@ -140,7 +140,7 @@ class TestValueOrderCorrelation:
             value_order_correlation([1, 2, 3], [0, 1, 2, 3])
 
         with pytest.raises(ValueError):
-            value_order_correlation([1, 2, 3], None)
+            value_order_correlation([1, 2, 3], None) # type: ignore[arg-type]
 
     def test_numpy_array_inputs(self):
         """Test that function works with numpy arrays as well as lists."""

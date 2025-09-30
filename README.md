@@ -318,7 +318,7 @@ If you use OpenGVL in your research, please cite:
 ```bibtex
 @misc{budzianowski2025opengvlbenchmarkingvisual,
       title={OpenGVL - Benchmarking Visual Temporal Progress for Data Curation}, 
-      author={Paweł Budzianowski and Emilia Wiśnios and Gracjan Góral and Igor Kulakov and Viktor Petrenko and Krzysztof Walas},
+      author={Paweł Budzianowski and Emilia Wiśnios and Gracjan Góral and Michał Tyrolski and Igor Kulakov and Viktor Petrenko and Krzysztof Walas},
       year={2025},
       eprint={2509.17321},
       archivePrefix={arXiv},

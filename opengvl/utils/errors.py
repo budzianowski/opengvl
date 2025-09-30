@@ -1,3 +1,8 @@
+"""Custom exception classes for the project (Python 3.8+ compatible)."""
+
+# ruff: noqa: UP007, UP035
+from typing import Optional
+
 class ImageEncodingError(RuntimeError):
     """Raised when an image cannot be converted or encoded."""
 
@@ -48,10 +53,13 @@ class PercentagesCountMismatch(Exception):
         self.found = found
 
 
+from typing import Optional  # noqa: UP035
+
+
 class PercentagesNormalizationError(Exception):
     """Raised when percentages cannot be normalized to sum to 100."""
 
-    def __init__(self, message: str | None = None):
+    def __init__(self, message: Optional[str] = None):
         super().__init__(message or "Unable to normalize percentages (invalid sum)")
 
 

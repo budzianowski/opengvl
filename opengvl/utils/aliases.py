@@ -1,16 +1,18 @@
 from dataclasses import dataclass
-from typing import Any, Protocol, TypeAlias, runtime_checkable
+from typing import Any, Protocol, Union, runtime_checkable
+
+# ruff: noqa: UP007 (Allow use of typing.Union for Python 3.8 compatibility in test environment)
 
 import numpy as np
 import numpy.typing as npt
 from PIL import Image as PILImage
 
-# Concrete image container aliases
-ImagePIL: TypeAlias = PILImage.Image
-ImageNumpyU8: TypeAlias = npt.NDArray[np.uint8]
-ImageNumpyF32: TypeAlias = npt.NDArray[np.float32]
-ImageNumpyF64: TypeAlias = npt.NDArray[np.float64]
-ImageNumpy: TypeAlias = ImageNumpyU8 | ImageNumpyF32 | ImageNumpyF64
+# Concrete image container aliases (runtime aliases without TypeAlias for wider compatibility)
+ImagePIL = PILImage.Image
+ImageNumpyU8 = npt.NDArray[np.uint8]
+ImageNumpyF32 = npt.NDArray[np.float32]
+ImageNumpyF64 = npt.NDArray[np.float64]
+ImageNumpy = Union[ImageNumpyU8, ImageNumpyF32, ImageNumpyF64]
 
 
 # Minimal torch-like tensor protocol (no hard torch dependency here)
@@ -26,13 +28,13 @@ class TorchTensorLike(Protocol):
     def cpu(self) -> "TorchTensorLike": ...
 
 
-ImageTorch: TypeAlias = TorchTensorLike
+ImageTorch = TorchTensorLike
 
 # Polymorphic image type accepted across the codebase
-ImageT: TypeAlias = ImagePIL | ImageNumpy | ImageTorch
+ImageT = Union[ImagePIL, ImageNumpyU8, ImageNumpyF32, ImageNumpyF64, ImageTorch]
 
 # Base64-encoded PNG chars as produced by encode_image
-EncodedImage: TypeAlias = bytes
+EncodedImage = bytes
 
 
 @dataclass(frozen=True)
