@@ -96,7 +96,6 @@ ignore = [
     # Abstract `raise` to an inner functionRuff 
     "TRY301",
     # Don't force wrapping single raise statements into helper functions
-    "TRY301",
     # Allow broad exception catching in tests / integration scaffolding if present
     "TRY002",
     "C901",
