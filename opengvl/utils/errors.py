@@ -53,7 +53,6 @@ class PercentagesCountMismatch(Exception):
         self.found = found
 
 
-from typing import Optional  # noqa: UP035
 
 
 class PercentagesNormalizationError(Exception):
