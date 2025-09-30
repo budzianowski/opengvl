@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from typing import Any, Protocol, Union, runtime_checkable
 
-# ruff: noqa: UP007 (Allow use of typing.Union for Python 3.8 compatibility in test environment)
-
 import numpy as np
 import numpy.typing as npt
 from PIL import Image as PILImage
+
+# ruff: noqa: UP007 (Allow use of typing.Union for Python 3.8 compatibility in test environment)
+
 
 # Concrete image container aliases (runtime aliases without TypeAlias for wider compatibility)
 ImagePIL = PILImage.Image
@@ -41,9 +42,11 @@ EncodedImage = bytes
 class Event:
     """Marker base for prompt events."""
 
+
 @dataclass(frozen=True)
 class TextEvent(Event):
     text: str
+
 
 @dataclass(frozen=True)
 class ImageEvent(Event):

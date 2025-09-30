@@ -36,9 +36,7 @@ class BaseModelClient(ABC):
         """
         self.rpm = float(rpm)
         # Persist a limiter instance so the rolling window spans calls.
-        self._rate_limiter: RateLimiter | None = (
-            RateLimiter(max_calls=self.rpm, period=SECS_PER_MIN) if self.rpm > 0.0 else None
-        )
+        self._rate_limiter: RateLimiter | None = RateLimiter(max_calls=self.rpm, period=SECS_PER_MIN) if self.rpm > 0.0 else None
 
     def generate_response(
         self,
@@ -146,14 +144,10 @@ class BaseModelClient(ABC):
         # Context frames (with known completion)
         counter = 1
         for ctx_episode in context_episodes:
-            for task_completion, frame in zip(
-                ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames
-            ):
+            for task_completion, frame in zip(ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames, strict=False):
                 yield TextEvent(phrases[PromptPhraseKey.CONTEXT_FRAME_LABEL_TEMPLATE.value].format(i=counter))
                 yield ImageEvent(frame)
-                yield TextEvent(
-                    phrases[PromptPhraseKey.CONTEXT_FRAME_COMPLETION_TEMPLATE.value].format(p=task_completion)
-                )
+                yield TextEvent(phrases[PromptPhraseKey.CONTEXT_FRAME_COMPLETION_TEMPLATE.value].format(p=task_completion))
                 counter += 1
 
         for instruction_str in phrases[PromptPhraseKey.EVAL_TASK_COMPLETION_INSTRUCTION.value]:

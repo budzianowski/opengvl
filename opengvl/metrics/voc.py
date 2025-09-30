@@ -23,16 +23,14 @@ def value_order_correlation(
     t = np.asarray(true_values, dtype=float)
 
     if v.shape[0] != t.shape[0]:
-        raise ValueError(
-            f"values and true_values must have the same length (got {v.shape[0]} and {t.shape[0]})"
-        )
+        raise ValueError(f"values and true_values must have the same length (got {v.shape[0]} and {t.shape[0]})")
     if v.size == 0:
-        return float('nan')
+        return float("nan")
     if v.size < 2:
-        return float('nan')
+        return float("nan")
     # If either array is constant, Spearman is undefined -> NaN
     if np.allclose(v, v[0]) or np.allclose(t, t[0]):
-        return float('nan')
+        return float("nan")
 
     # spearmanr returns a SignificanceResult (SciPy >=1.11) or a tuple in older versions; we type it broadly.
     corr: SignificanceResult = spearmanr(v, t)  # type: ignore[assignment]
@@ -61,9 +59,6 @@ class VOCMetric(Metric):
         if np.isnan(corr_value):
             # Map undefined correlations to 0.0 for downstream aggregation while
             # preserving a note about the degeneracy.
-            note = (
-                "insufficient length" if len(chrono) <= 1 else "constant predictions"
-                if np.allclose(chrono, chrono[0]) else "undefined correlation"
-            )
+            note = "insufficient length" if len(chrono) <= 1 else "constant predictions" if np.allclose(chrono, chrono[0]) else "undefined correlation"
             return MetricResult(name=self.name, value=0.0, details={"note": note})
         return MetricResult(name=self.name, value=float(corr_value))
