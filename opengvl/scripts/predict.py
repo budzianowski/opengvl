@@ -47,9 +47,7 @@ def main(config: DictConfig) -> None:
     jsonl_path = output_dir / "predictions.jsonl"
 
     examples = infer_utils.load_fewshot_examples(data_loader, num_examples, config.dataset.name)
-    logger.info(
-        f"Loaded {len(examples)} (in-context trajectories (0 or more) + eval trajectory) examples for prediction"
-    )
+    logger.info(f"Loaded {len(examples)} (in-context trajectories (0 or more) + eval trajectory) examples for prediction")
     if len(examples) == 0:
         logger.warning("No examples loaded; exiting")
         return

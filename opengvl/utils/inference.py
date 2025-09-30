@@ -72,7 +72,7 @@ def extract_percentages(
     scale = 100.0 / total
     scaled = [v * scale for v in vals]
     floors = [math.floor(x) for x in scaled]
-    remainders = [x - f for x, f in zip(scaled, floors)]
+    remainders = [x - f for x, f in zip(scaled, floors, strict=False)]
     current_sum = sum(floors)
     need = int(100 - current_sum)
 
@@ -145,9 +145,7 @@ def predict_on_fewshot_input(
 
     The logic mirrors the original script function without changes.
     """
-    logger.info(
-        f"Processing example {idx + 1}/{total} (episode_index={ex.eval_episode.episode_index}) from {dataset_name}"
-    )
+    logger.info(f"Processing example {idx + 1}/{total} (episode_index={ex.eval_episode.episode_index}) from {dataset_name}")
     prompt = format_prompt(prompt_template, instruction=ex.eval_episode.instruction)
     logger.debug(f"Prompt (truncated {N_DEBUG_PROMPT_CHARS} chars): {prompt[:N_DEBUG_PROMPT_CHARS]}...")
     try:
