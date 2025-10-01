@@ -1,6 +1,7 @@
 import numpy as np
 from datasets.utils.logging import disable_progress_bar
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
+from lerobot.datasets.push_dataset_to_hub.utils import calculate_episode_data_index
 from loguru import logger
 
 from opengvl.data_loaders.base import BaseDataLoader
@@ -45,8 +46,10 @@ class HuggingFaceDataLoader(BaseDataLoader):
     def _load_episode_frames(self, episode_index: int) -> tuple[list, str]:
         ds = LeRobotDataset(self.dataset_name, episodes=[episode_index])
         camera_key = ds.meta.camera_keys[self.camera_index]
-        from_idx = int(ds.episode_data_index["from"][0].item())
-        to_idx = int(ds.episode_data_index["to"][0].item())
+        episode_data_index = calculate_episode_data_index(ds.hf_dataset)
+        from_idx = int(episode_data_index["from"][episode_index].item())
+        to_idx = int(episode_data_index["to"][episode_index].item())
+        logger.info(f'Loading episode [{episode_index}] frames from {from_idx} to {to_idx} (exclusive)')
         frames = [ds[i][camera_key] for i in range(from_idx, to_idx)]
         instruction = ds[from_idx]["task"]
         return frames, instruction

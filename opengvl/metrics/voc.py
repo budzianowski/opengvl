@@ -1,6 +1,5 @@
-# ruff: noqa: UP007 (Allow use of typing.Union for Python <3.10 compatibility in some environments)
 from collections.abc import Sequence
-from typing import Union
+from typing import cast
 
 import numpy as np
 from loguru import logger
@@ -12,8 +11,8 @@ from opengvl.utils.data_types import InferredFewShotResult
 
 
 def value_order_correlation(
-    values: Union[Sequence[float], np.ndarray],
-    true_values: Union[Sequence[float], np.ndarray],
+    values: Sequence[float] | np.ndarray,
+    true_values: Sequence[float] | np.ndarray,
 ) -> float:
     if values is None or true_values is None:
         raise ValueError("values and true_values must not be None")
@@ -33,7 +32,8 @@ def value_order_correlation(
         return float("nan")
 
     # spearmanr returns a SignificanceResult (SciPy >=1.11) or a tuple in older versions; we type it broadly.
-    corr: SignificanceResult = spearmanr(v, t)  # type: ignore[assignment]
+    # corr: SignificanceResult = cast(spearmanr(v, t))
+    corr: SignificanceResult = cast(SignificanceResult, spearmanr(v, t))
     score = float(corr.statistic if hasattr(corr, "statistic") else corr[0])  # type: ignore[index]
     return score
 

@@ -6,7 +6,8 @@ import numpy as np
 from loguru import logger
 from PIL import Image
 
-from opengvl.utils.aliases import EncodedImage, ImageNumpy, ImagePIL, ImageT, TorchTensorLike
+from opengvl.utils.aliases import (EncodedImage, ImageNumpy, ImagePIL, ImageT,
+                                   TorchTensorLike)
 from opengvl.utils.constants import IMG_SIZE
 from opengvl.utils.errors import ImageEncodingError
 
