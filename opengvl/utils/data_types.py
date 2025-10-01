@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 
 from opengvl.utils.aliases import ImageNumpy
-from opengvl.utils.errors import OriginalFramesLengthMismatch, ShuffledFramesIndicesNotSubset, ShuffledFramesLengthMismatch
+from opengvl.utils.errors import (OriginalFramesLengthMismatch,
+                                  ShuffledFramesIndicesNotSubset,
+                                  ShuffledFramesLengthMismatch)
 
 
 @dataclass
