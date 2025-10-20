@@ -1,0 +1,9 @@
+initial_scene_label: "Task Start:"
+initial_scene_completion: "The task begins with 0% completion."
+context_frame_label_template: "Context {i}:"
+context_frame_completion_template: "Completion Status: {p}%"
+eval_frame_label_template: "Frame {i} for Evaluation:"
+eval_task_completion_instruction:
+  - "Your goal is to perform {instruction}. Now, state the task completion percentage for the following randomly ordered frames. Use this exact format: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Percentages must be precise."
+  - "Pay attention: frames are shuffled."

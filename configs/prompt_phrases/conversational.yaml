@@ -1,0 +1,9 @@
+initial_scene_label: "Let's start:"
+initial_scene_completion: "Right at the beginning, the task is 0% complete."
+context_frame_label_template: "Next up, Frame {i}:"
+context_frame_completion_template: "Current Progress: {p}%"
+eval_frame_label_template: "Your turn, Frame {i}:"
+eval_task_completion_instruction:
+  - "Okay, time to evaluate the '{instruction}' task. You'll see some frames below, but they're all mixed up. Tell me the completion percentage for each one. Make sure your answer looks like this: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Be super accurate. The percentage should show how much of the task is done."
+  - "Just a reminder, they aren't in order!"
