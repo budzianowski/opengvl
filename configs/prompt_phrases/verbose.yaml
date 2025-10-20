@@ -1,0 +1,9 @@
+initial_scene_label: "Beginning of Task:"
+initial_scene_completion: "The scenario begins with the task completion recorded at 0%."
+context_frame_label_template: "Sequential Frame {i}:"
+context_frame_completion_template: "Task Advancement: {p}%"
+eval_frame_label_template: "Assessment Frame {i}:"
+eval_task_completion_instruction:
+  - "For the following set of frames, which are presented out of order, you must evaluate the percentage of task completion for the goal: '{instruction}'. Adhere strictly to this response format: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Be meticulous. The percentage must accurately represent the state of completion."
+  - "We remind you that the frames' order is randomized."

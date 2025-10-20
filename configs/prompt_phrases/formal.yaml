@@ -1,0 +1,9 @@
+initial_scene_label: "Starting State:"
+initial_scene_completion: "At the starting state, the task's progress is 0%."
+context_frame_label_template: "Reference Frame {i}:"
+context_frame_completion_template: "Progress Level: {p}%"
+eval_frame_label_template: "Query Frame {i}:"
+eval_task_completion_instruction:
+  - "Considering the objective '{instruction}', please assess the task completion percentage for the subsequent frames, which are provided in a non-sequential order. Structure your answer for each frame as follows: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Your assessment must be exact and reflect the true progress."
+  - "Note: The query frames are not in chronological order."

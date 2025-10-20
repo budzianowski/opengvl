@@ -1,0 +1,9 @@
+initial_scene_label: "Initial Setup:"
+initial_scene_completion: "In the initial setup, what is the completion? 0%."
+context_frame_label_template: "Reference {i}:"
+context_frame_completion_template: "What is the completion? {p}%"
+eval_frame_label_template: "Query {i}:"
+eval_task_completion_instruction:
+  - "Now, let's evaluate the task: {instruction}. For the following frames (which are in random order), what is the task completion percentage? Please use the format: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Provide a precise and rigorous percentage for task completion."
+  - "Remember, the order is random."

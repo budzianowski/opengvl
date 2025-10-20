@@ -1,0 +1,9 @@
+initial_scene_label: "Agent Initial State:"
+initial_scene_completion: "The agent's task progress starts at 0%."
+context_frame_label_template: "Agent Context Frame {i}:"
+context_frame_completion_template: "Agent Task Progress: {p}%"
+eval_frame_label_template: "Agent Eval Frame {i}:"
+eval_task_completion_instruction:
+  - "The agent's task is: {instruction}. For the frames below, presented in a jumbled sequence, report the task completion percentage. Use this template: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Accuracy is crucial; the percentage must reflect the agent's progress."
+  - "Warning: Frame sequence is randomized."

@@ -1,0 +1,9 @@
+initial_scene_label: "Baseline Scene:"
+initial_scene_completion: "Task status at baseline: 0% finished."
+context_frame_label_template: "Sequential Update {i}:"
+context_frame_completion_template: "Percent Finished: {p}%"
+eval_frame_label_template: "Test Scene {i}:"
+eval_task_completion_instruction:
+  - "Your objective is: {instruction}. You will be shown several scenes out of order. For each one, state how much of the task is finished (as a percentage). Follow this output structure: Frame {{i}}: Task Completion Percentages:{{}}%"
+  - "Be exact. The percentage must correspond to the level of task completion."
+  - "Important: The scenes are shuffled and not in order."
