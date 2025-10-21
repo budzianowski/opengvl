@@ -129,7 +129,7 @@ The VLM returns a text response with per-frame percentages. `extract_percentages
 For reproducible, portable runs:
 
 Prerequisites:
-- [Apptainer](https://apptainer.org/docs/user/main/installation.html)
+- [Apptainer](https://apptainer.org/docs/user/main/quick_start.html#installation)
 - NVIDIA drivers on the host for GPU support (for locally inferred models)
 
 Build the image:
