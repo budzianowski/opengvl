@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 
 from opengvl.utils.aliases import ImageNumpy
-from opengvl.utils.errors import (OriginalFramesLengthMismatch,
-                                  ShuffledFramesIndicesNotSubset,
-                                  ShuffledFramesLengthMismatch)
+from opengvl.utils.errors import OriginalFramesLengthMismatch, ShuffledFramesIndicesNotSubset, ShuffledFramesLengthMismatch
 
 
 @dataclass
@@ -66,16 +64,8 @@ class InferredEpisode(Episode):
     the shuffled frames.
     """
 
-    shuffled_frames_predicted_completion_rates: list[int]  # aligned 1:1 with shuffled_frames
-
-    def __post_init__(self):
-        super().__post_init__()
-        if len(self.shuffled_frames_predicted_completion_rates) != len(self.shuffled_frames):
-            raise ShuffledFramesLengthMismatch(
-                len(self.shuffled_frames_predicted_completion_rates),
-                len(self.shuffled_frames),
-                len(self.shuffled_frames_approx_completion_rates),
-            )
+    shuffled_frames_predicted_completion_rates: list[int]  # should be aligned 1:1 with shuffled_frames
+    # if not, that means that model failed to predict for all frames (e.g. returned incomplete list of preds)
 
     @classmethod
     def from_predictions(cls, episode: Episode, predictions: list[int]) -> "InferredEpisode":

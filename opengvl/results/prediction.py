@@ -16,6 +16,7 @@ class PredictionRecord:
     predicted_percentages: list[int]
     valid_length: bool
     metrics: dict[str, Any]
+    error_count: dict[str, int]
     raw_response: str | None = None
 
     def to_dict(self, *, include_images: bool = False) -> dict[str, Any]:
@@ -28,6 +29,7 @@ class PredictionRecord:
         ctx_count = len(ctx_eps)
         ctx_indices = [ep.episode_index for ep in ctx_eps]
         ctx_frames_per_ep = [len(ep.shuffled_frames) for ep in ctx_eps]
+
         base = {
             "index": self.index,
             "dataset": self.dataset,
@@ -45,6 +47,7 @@ class PredictionRecord:
             "predicted_percentages": self.predicted_percentages,
             "valid_length": self.valid_length,
             "metrics": self.metrics,
+            "error_count": self.error_count,
         }
         if self.raw_response is not None:
             base["raw_response"] = self.raw_response
