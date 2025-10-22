@@ -1,0 +1,3 @@
+_target_: opengvl.clients.glm.GLMClient
+model_name: zai-org/GLM-4.1V-9B-Thinking
+max_input_length: 128_000
