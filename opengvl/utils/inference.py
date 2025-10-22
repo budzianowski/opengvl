@@ -131,6 +131,7 @@ def predict_on_fewshot_input(
     save_raw: bool,
     voc_metric: VOCMetric,
     dataset_name: str,
+    temperature: float,
     *,
     prompt_phrases: dict[str, str] | None = None,
 ) -> PredictionRecord:
@@ -146,6 +147,7 @@ def predict_on_fewshot_input(
             prompt,
             ex.eval_episode,
             ex.context_episodes,
+            temperature=temperature,
             prompt_phrases=(prompt_phrases or {}),
         )
     except (RuntimeError, ValueError, OSError) as e:

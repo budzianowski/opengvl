@@ -25,7 +25,7 @@ class OpenAIClient(BaseModelClient):
         self.detail = detail
         logger.info(f"Using OpenAI model {self.model_id}")
 
-    def _generate_from_events(self, events: list[Event]) -> str:
+    def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         content = []
         for ev in events:
             if isinstance(ev, TextEvent):
@@ -46,5 +46,6 @@ class OpenAIClient(BaseModelClient):
             model=self.model_id,
             input=messages,  # type: ignore[arg-type]
             max_output_tokens=MAX_TOKENS_TO_GENERATE,
+            temperature=temperature,
         )
         return response.output_text

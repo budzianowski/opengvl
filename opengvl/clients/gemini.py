@@ -22,7 +22,7 @@ class GeminiClient(BaseModelClient):
         self.model_name = model_name
         logger.info(f"Using Gemini model {self.model_name}")
 
-    def _generate_from_events(self, events: list[Event]) -> str:
+    def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         contents: list = []
         for ev in events:
             if isinstance(ev, TextEvent):
@@ -32,7 +32,7 @@ class GeminiClient(BaseModelClient):
                 contents.append(Part.from_bytes(data=encode_image(img), mime_type="image/png"))
 
         logger.debug(f"Contents length: {len(contents)} parts")
-        response = self.client.models.generate_content(model=self.model_name, contents=contents)
+        response = self.client.models.generate_content(model=self.model_name, contents=contents, temperature=temperature)
         if response.text is None:
             raise RuntimeError()
         return response.text

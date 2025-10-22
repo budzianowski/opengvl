@@ -28,13 +28,15 @@ class BaseModelClient(ABC):
     244x244 PNG base64 strings for multimodal APIs.
     """
 
-    def __init__(self, *, rpm: float = 0.0) -> None:
+    def __init__(self, *, rpm: float = 0.0, max_input_length: int = 32000) -> None:
         """Initialize the base model client.
 
         Args:
             rpm: Requests per minute rate limit (0.0 for no limit).
+            max_input_length: Maximum input length for the model.
         """
         self.rpm = float(rpm)
+        self.max_input_length = max_input_length
         # Persist a limiter instance so the rolling window spans calls.
         self._rate_limiter: RateLimiter | None = RateLimiter(max_calls=self.rpm, period=SECS_PER_MIN) if self.rpm > 0.0 else None
 
@@ -43,6 +45,7 @@ class BaseModelClient(ABC):
         prompt: str,
         eval_episode: Episode,
         context_episodes: list[Episode],
+        temperature: float = 0.0,
         *,
         prompt_phrases: dict[str, str],
     ) -> str:
@@ -173,6 +176,7 @@ class BaseModelClient(ABC):
         prompt: str,
         eval_episode: Episode,
         context_episodes: list[Episode],
+        temperature: float = 0.0,
         *,
         prompt_phrases: dict[str, str],
     ) -> str:
@@ -188,6 +192,6 @@ class BaseModelClient(ABC):
         return self._generate_from_events(events)
 
     @abstractmethod
-    def _generate_from_events(self, events: list[Event]) -> str:  # pragma: no cover - interface only
+    def _generate_from_events(self, events: list[Event], temperature: float) -> str:  # pragma: no cover - interface only
         """Transform provider-agnostic prompt events into a model response."""
         raise NotImplementedError

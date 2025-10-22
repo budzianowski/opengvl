@@ -67,6 +67,7 @@ def main(config: DictConfig) -> None:
             save_raw,
             voc_metric,
             config.dataset.name,
+            temperature=float(config.prediction.get("temperature", 1.0)),
             prompt_phrases=prompt_phrases,
         )
         for idx, ex in tqdm(enumerate(examples), total=num_examples, desc="Predicting")

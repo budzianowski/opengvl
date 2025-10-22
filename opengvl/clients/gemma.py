@@ -20,7 +20,7 @@ class GemmaClient(BaseModelClient):
         self.processor = AutoProcessor.from_pretrained(model_id)
         logger.info(type(self.processor))
 
-    def _generate_from_events(self, events: list[Event]) -> str:
+    def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         messages = [{"role": "user", "content": []}]
         for ev in events:
             if isinstance(ev, TextEvent):
@@ -41,8 +41,12 @@ class GemmaClient(BaseModelClient):
             raise ValueError()
         logger.info(f"Input length: {input_len}")
 
+
         with torch.inference_mode():
-            output = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, do_sample=False)
+            if temperature > 0.0:
+                output = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, do_sample=True, temperature=temperature)
+            else:
+                output = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, do_sample=False)
             output = output[0][input_len:]
 
         return self.processor.decode(output, skip_special_tokens=True)

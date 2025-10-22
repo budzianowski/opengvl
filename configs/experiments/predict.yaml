@@ -1,21 +1,22 @@
 defaults:
   - dataset: nyudoor
   - data_loader: huggingface
-  - model: gemini
-  - prompts: rigorous
+  - model: gemma
+  - prompts: default
   - prompt_phrases: default
   - _self_
 
-seed: 2137          # Global seed (propagated to loader & any RNG-dependent logic)
+seed: 42          # Global seed (propagated to loader & any RNG-dependent logic)
 shuffle: true       # Whether to shuffle frame presentation order
 
 dataset:
-  num_context_episodes: 2  # How many in-context episodes to provide
+  num_context_episodes: 0  # How many in-context episodes to provide
 
 prediction:
-  num_examples: 1   # How many FewShotInput predictions to perform
+  num_examples: 50   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
   output_dir: ${hydra:run.dir}/${hydra:job.num}/predictions
+  temperature: 1.0  # Sampling temperature for generation
 
 hydra:
   mode: MULTIRUN # comment this if you don't want to sweep
@@ -26,6 +27,6 @@ hydra:
     subdir: ${hydra.job.num}
   sweeper:
     params:
-      dataset.num_context_episodes: 2
+      dataset.num_context_episodes: 0
   # Rely on config_path and defaults; no extra search paths required
 
