@@ -8,12 +8,13 @@ from loguru import logger
 from omegaconf import DictConfig
 
 from opengvl.clients.base import BaseModelClient
+from opengvl.metrics.base import MetricResult
+from opengvl.metrics.voc import VOCMetric
 from opengvl.results.prediction import PredictionRecord
 from opengvl.utils.constants import N_DEBUG_PROMPT_CHARS
 from opengvl.utils.data_types import Example as FewShotInput
 from opengvl.utils.data_types import InferredEpisode, InferredFewShotResult
-from opengvl.utils.errors import (PercentagesCountMismatch,
-                                  PercentagesNormalizationError)
+from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
 
@@ -22,7 +23,6 @@ PERCENT_FLOAT_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*%")
 
 def extract_percentages(
     text: str,
-    expected: int,
 ) -> list[int]:
     """Extract percentages in order of appearance and return integers.
 
@@ -33,10 +33,6 @@ def extract_percentages(
 
     Args:
         text: Source text.
-        expected: Expected number of percentages. The function
-            will validate that exactly this many values are present. If the
-            count does not match, a ValueError is raised. Extraction does not
-            truncate; all percentages found are considered.
     Returns:
         List of integer percentages within [0, 100].
     """
@@ -54,10 +50,6 @@ def extract_percentages(
     # If no values found, return empty list
     if not vals:
         return []
-
-    # Enforce expected length if provided
-    if expected is not None and len(vals) != expected:
-        raise PercentagesCountMismatch(expected, len(vals))
 
     has_fractional = any((v % 1) != 0 for v in vals)
     if not has_fractional:
@@ -137,11 +129,11 @@ def predict_on_fewshot_input(
     client: BaseModelClient,
     prompt_template: str,
     save_raw: bool,
-    voc_metric,
+    voc_metric: VOCMetric,
     dataset_name: str,
     *,
     prompt_phrases: dict[str, str] | None = None,
-):
+) -> PredictionRecord:
     """Run model prediction and metric computation on a single few-shot input.
 
     The logic mirrors the original script function without changes.
@@ -163,15 +155,34 @@ def predict_on_fewshot_input(
     logger.debug(f"Response on example {idx}:\n{response_text}")
 
     expected_len = len(ex.eval_episode.shuffled_frames)
+    error_count: dict[str, int] = {
+        PercentagesCountMismatch.__name__: 0,
+        PercentagesNormalizationError.__name__: 0,
+    }
+
     try:
-        predicted = extract_percentages(response_text, expected=expected_len)
+        predicted = extract_percentages(response_text)
         logger.success(f"Extracted {len(predicted)} percentages on example {idx}")
-    except (PercentagesCountMismatch, PercentagesNormalizationError) as e:
+    except PercentagesNormalizationError as e:
         logger.error(f"Extraction error on example {idx}: {e}")
-        raise
+        predicted = []
+        error_count[PercentagesNormalizationError.__name__] += 1
+
+    if len(predicted) != expected_len:
+        logger.error(
+            f"Count mismatch on example {idx}: expected {expected_len}, "
+            f"got {len(predicted)}"
+        )
+        error_count[PercentagesCountMismatch.__name__] += 1
 
     inferred: InferredFewShotResult = build_inferred_example(ex, predicted)
-    metric_res = voc_metric.compute(inferred)
+
+    if sum(error_count.values()) > 0:
+        metric_res = MetricResult(name=voc_metric.name, value=0, details={
+            "note": f"errors in prediction prevented metric computation {error_count!s}"
+        })
+    else:
+        metric_res = voc_metric.compute(inferred)
     metrics_payload = {metric_res.name: metric_res.value}
 
     if metric_res.details:
@@ -192,6 +203,7 @@ def predict_on_fewshot_input(
         valid_length=len(predicted) == len(ex.eval_episode.shuffled_frames),
         metrics=metrics_payload,
         raw_response=response_text if save_raw else None,
+        error_count=error_count,
     )
     logger.info(f"Example {idx}: preds={len(predicted)}/{len(ex.eval_episode.shuffled_frames)} VOC={metric_res.value}")
     return record
