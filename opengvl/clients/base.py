@@ -75,6 +75,7 @@ class BaseModelClient(ABC):
                             prompt,
                             eval_episode,
                             context_episodes,
+                            temperature,
                             prompt_phrases=prompt_phrases,
                         )
 
@@ -83,6 +84,7 @@ class BaseModelClient(ABC):
                         prompt,
                         eval_episode,
                         context_episodes,
+                        temperature,
                         prompt_phrases=prompt_phrases,
                     )
                 logger.info(f"Model response length: {len(res)} characters")
@@ -189,7 +191,7 @@ class BaseModelClient(ABC):
                 prompt_phrases=prompt_phrases,
             )
         )
-        return self._generate_from_events(events)
+        return self._generate_from_events(events, temperature)
 
     @abstractmethod
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:  # pragma: no cover - interface only

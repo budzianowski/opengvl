@@ -61,8 +61,12 @@ class BaseDataLoader(ABC):
             return []
         if total <= self.num_frames:
             return list(range(total))
-        # Evenly spaced selection over [0, total-1]
-        return np.linspace(0, total - 1, self.num_frames, dtype=int).tolist()
+        # Evenly spaced selection over [1, total-1]
+        # Exclude first frame (always included)
+        # return np.linspace(1, total - 1, self.num_frames, dtype=int).tolist()
+        frames = self._rng.choice(range(1, total), self.num_frames, replace=False)
+        frames = np.sort(frames)
+        return frames.tolist()
 
     def _maybe_shuffle(self, indices: Sequence[int], *, rng: np.random.Generator | None = None) -> list[int]:
         indices = list(indices)
@@ -91,8 +95,8 @@ class BaseDataLoader(ABC):
         - Optionally shuffles their presentation order
         - Fills both original and shuffled completion rates
         """
-        # Deterministic per-episode RNG to ensure stable shuffles across runs
-        per_ep_rng = np.random.default_rng(self.seed + int(episode_index))
+        # # Deterministic per-episode RNG to ensure stable shuffles across runs
+        # per_ep_rng = np.random.default_rng(self.seed + int(episode_index))
 
         if len(frames) == 0:
             raise ValueError
@@ -107,7 +111,7 @@ class BaseDataLoader(ABC):
         original_completion = self._linear_completion(len(selected_frames))
 
         # Shuffled presentation order
-        shuffled_indices = self._maybe_shuffle(original_indices, rng=per_ep_rng)
+        shuffled_indices = self._maybe_shuffle(original_indices, rng=self._rng)
         shuffled_frames = [frames_np[i] for i in shuffled_indices]
         shuffled_completion_approx = self._linear_completion(len(shuffled_frames))
 

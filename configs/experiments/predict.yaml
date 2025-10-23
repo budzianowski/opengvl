@@ -16,7 +16,7 @@ prediction:
   num_examples: 50   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
   output_dir: ${hydra:run.dir}/${hydra:job.num}/predictions
-  temperature: 1.0  # Sampling temperature for generation
+  temperature: 0  # Sampling temperature for generation
 
 hydra:
   mode: MULTIRUN # comment this if you don't want to sweep
