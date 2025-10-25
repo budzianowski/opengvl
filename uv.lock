@@ -1391,6 +1391,7 @@ dependencies = [
     { name = "seaborn" },
     { name = "tensorflow" },
     { name = "tensorflow-datasets" },
+    { name = "tf-keras" },
     { name = "tfds" },
     { name = "tiktoken" },
     { name = "torch" },
@@ -1439,6 +1440,7 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "tensorflow", specifier = ">=2.19.0" },
     { name = "tensorflow-datasets", specifier = ">=4.9.9" },
+    { name = "tf-keras", specifier = ">=2.20.1" },
     { name = "tfds", specifier = ">=0.3" },
     { name = "tiktoken", specifier = ">=0.11.0" },
     { name = "torch", specifier = ">=2.7.1" },
@@ -4503,6 +4505,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ca/6c/3d75c196ac07ac8749600b60b03f4f6094d54e132c4d94ebac6ee0e0add0/termcolor-3.1.0.tar.gz", hash = "sha256:6a6dd7fbee581909eeec6a756cff1d7f7c376063b14e4a298dc4980309e55970", size = 14324, upload-time = "2025-04-30T11:37:53.791Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4f/bd/de8d508070629b6d84a30d01d57e4a65c69aa7f5abe7560b8fad3b50ea59/termcolor-3.1.0-py3-none-any.whl", hash = "sha256:591dd26b5c2ce03b9e43f391264626557873ce1d379019786f99b0c2bee140aa", size = 7684, upload-time = "2025-04-30T11:37:52.382Z" },
+]
+
+[[package]]
+name = "tf-keras"
+version = "2.20.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tensorflow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/38/6060f6c7472439bb3890b9094d69d31d9f8d5da123b16c738773e70fff91/tf_keras-2.20.1.tar.gz", hash = "sha256:884be5938fb0b2b53b1583c1ae2b660ef87215377c29b5b6a77fd221b472aeaf", size = 1254487, upload-time = "2025-09-04T21:23:41.81Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/85/6b/d9a8202bfe5c9e3b078cf550bafab962aa9d6b1a1f1180f0065399d4c9b2/tf_keras-2.20.1-py3-none-any.whl", hash = "sha256:3f0e0a34d9a4c8758f24fdc1053e6e335f16ab5534c7d34f1899b8924779760c", size = 1694335, upload-time = "2025-09-04T21:23:40.153Z" },
 ]
 
 [[package]]

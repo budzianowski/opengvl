@@ -38,6 +38,7 @@ dependencies = [
     "pylint>=3.3.8",
     "wandb>=0.22.1",
     "qwen-vl-utils>=0.0.14",
+    "tf-keras>=2.20.1",
 ]
 
 [project.optional-dependencies]
