@@ -49,7 +49,7 @@ class HuggingFaceDataLoader(BaseDataLoader):
         episode_data_index = calculate_episode_data_index(ds.hf_dataset)
         from_idx = int(episode_data_index["from"][episode_index].item())
         to_idx = int(episode_data_index["to"][episode_index].item())
-        logger.info(f'Loading episode [{episode_index}] frames from {from_idx} to {to_idx} (exclusive)')
+        logger.info(f"Loading episode [{episode_index}] frames from {from_idx} to {to_idx} (exclusive)")
         frames = [ds[i][camera_key] for i in range(from_idx, to_idx)]
         instruction = ds[from_idx]["task"]
         return frames, instruction

@@ -1,13 +1,13 @@
 from typing import cast
-import torch
+
 from loguru import logger
+from qwen_vl_utils import process_vision_info
 from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
 from opengvl.clients.base import BaseModelClient
 from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
 from opengvl.utils.images import to_pil
-from qwen_vl_utils import process_vision_info
 
 
 class QwenClient(BaseModelClient):
@@ -27,9 +27,7 @@ class QwenClient(BaseModelClient):
             elif isinstance(ev, ImageEvent):
                 messages[0]["content"].append({"type": "image", "image": to_pil(cast(ImageT, ev.image))})
 
-        text = self.processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
+        text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         image_inputs, video_inputs = process_vision_info(messages)
 
         inputs = self.processor(
@@ -48,12 +46,8 @@ class QwenClient(BaseModelClient):
 
         # Inference: Generation of the output
         generated_ids = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, temperature=temperature)
-        generated_ids_trimmed = [
-            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        
-        output_text = self.processor.batch_decode(
-            generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )
+        generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids, strict=False)]
+
+        output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
         return output_text[0]

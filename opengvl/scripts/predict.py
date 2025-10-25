@@ -8,6 +8,7 @@ Steps:
 """
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import hydra
@@ -16,14 +17,13 @@ from hydra.utils import instantiate
 from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
-from datetime import datetime
 
 from opengvl.clients.base import BaseModelClient
 from opengvl.data_loaders.base import BaseDataLoader
+from opengvl.mapper.base import BaseMapper
 from opengvl.metrics.voc import VOCMetric
 from opengvl.results.prediction import aggregate_metrics
 from opengvl.utils import inference as infer_utils
-from opengvl.mapper.base import BaseMapper
 
 
 @hydra.main(version_base=None)
@@ -38,7 +38,7 @@ def main(config: DictConfig) -> None:
     client: BaseModelClient = instantiate(config.model)
     mapper: BaseMapper = instantiate(config.mapper)
     prompt_template: str = config.prompts.template
-    
+
     logger.info(
         f"Instantiated components | dataset={config.dataset.name} loader={data_loader.__class__.__name__} "
         f"model={client.__class__.__name__} prompt_template_chars={len(prompt_template)}"
@@ -49,7 +49,7 @@ def main(config: DictConfig) -> None:
     output_dir = Path(str(config.prediction.output_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
     model_name_safe = client.model_name.replace("/", "_")
-    starting_time = datetime.now().strftime('%Y%m%d_%H%M%S')
+    starting_time = datetime.now().strftime("%Y%m%d_%H%M%S")
     jsonl_path = output_dir / f"{model_name_safe}_{starting_time}_predictions.jsonl"
 
     examples = infer_utils.load_fewshot_examples(data_loader, num_examples, config.dataset.name)
@@ -90,12 +90,12 @@ def main(config: DictConfig) -> None:
         f"voc_mean={dataset_metrics.metric_means.get('voc', float('nan')):.4f}"
     )
     summary = dict()
-    summary['model_name'] = client.model_name
-    summary['dataset_name'] = config.dataset.name
-    summary['prediction_time'] = starting_time
-    summary['temperature'] = float(config.prediction.get("temperature", 1.0))
-    summary['num_examples'] = len(records)
-    summary['metrics'] = dataset_metrics.to_dict()
+    summary["model_name"] = client.model_name
+    summary["dataset_name"] = config.dataset.name
+    summary["prediction_time"] = starting_time
+    summary["temperature"] = float(config.prediction.get("temperature", 1.0))
+    summary["num_examples"] = len(records)
+    summary["metrics"] = dataset_metrics.to_dict()
 
     with (output_dir / f"{model_name_safe}_{starting_time}_summary.json").open("w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)

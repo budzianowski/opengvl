@@ -113,10 +113,7 @@ class BaseDataLoader(ABC):
         # Shuffled presentation order
         shuffled_indices = self._maybe_shuffle(original_indices, rng=per_ep_rng)
         shuffled_frames = [frames_np[i] for i in shuffled_indices]
-        shuffled_completion_approx = [
-            original_completion[original_indices.index(i)] for i in shuffled_indices
-        ]
-
+        shuffled_completion_approx = [original_completion[original_indices.index(i)] for i in shuffled_indices]
 
         starting_frame = frames_np[original_indices[0]]
 

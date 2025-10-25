@@ -1,8 +1,9 @@
-
-import re
-from opengvl.utils.errors import PercentagesNormalizationError
-from opengvl.mapper.base import BaseMapper
 import math
+import re
+
+from opengvl.mapper.base import BaseMapper
+from opengvl.utils.errors import PercentagesNormalizationError
+
 
 class RegexMapper(BaseMapper):
     def __init__(self):

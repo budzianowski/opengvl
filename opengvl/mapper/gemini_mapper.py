@@ -1,15 +1,18 @@
-from opengvl.mapper.base import BaseMapper
-from google import genai
-from google.genai import types
 import json
 import os
 import time
+
+from google import genai
+from google.genai import types
+
+from opengvl.mapper.base import BaseMapper
 from opengvl.utils.errors import PercentagesNormalizationError
 
 
 class GeminiMapper(BaseMapper):
-    def __init__(self, model_name: str = "gemini-2.5-flash-lite", max_new_tokens: int = 1024,         
-        temperature: float = 0.5, retries: int = 3, mapping_prompt: str = ""):
+    def __init__(
+        self, model_name: str = "gemini-2.5-flash-lite", max_new_tokens: int = 1024, temperature: float = 0.5, retries: int = 3, mapping_prompt: str = ""
+    ):
         super().__init__()
         self.model_name = model_name
         self.max_new_tokens = max_new_tokens
@@ -17,7 +20,6 @@ class GeminiMapper(BaseMapper):
         self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         self.retries = retries
         self.mapping_prompt = mapping_prompt.template
-
 
     def extract_percentages(self, model_response: str) -> list[float]:
         """
@@ -39,11 +41,11 @@ class GeminiMapper(BaseMapper):
                         temperature=self.temperature,
                         max_output_tokens=self.max_new_tokens,
                     ),
-                    contents=model_response
+                    contents=model_response,
                 )
 
                 response_content = response.text
-    
+
                 if "```json\n" in response_content:
                     response_content = response_content.split("```json\n")[1]
                 if "\n```" in response_content:
@@ -52,7 +54,7 @@ class GeminiMapper(BaseMapper):
                 json_response = json.loads(response_content)
 
                 prediction = json_response.get("prediction", [])
-                
+
                 return prediction
 
             except Exception as e:
@@ -62,4 +64,3 @@ class GeminiMapper(BaseMapper):
                     time.sleep(4)
                 else:
                     raise PercentagesNormalizationError
-

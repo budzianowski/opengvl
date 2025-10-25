@@ -2,7 +2,7 @@ import os
 from typing import cast
 
 from google.genai.client import Client
-from google.genai.types import Part, GenerateContentConfig
+from google.genai.types import GenerateContentConfig, Part
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient

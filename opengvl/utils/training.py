@@ -210,5 +210,3 @@ class FinetuneTrainer:
         self.tokenizer.save_pretrained(self.plan.output_dir)
 
         return FinetuneArtifacts(model_dir=self.plan.output_dir, trainer=trainer)
-
-

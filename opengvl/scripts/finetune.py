@@ -33,11 +33,11 @@ def main(config: DictConfig) -> None:
     logger.info("Environment variables loaded (dotenv)")
     logger.info(f"Configuration:\n{OmegaConf.to_yaml(config)}")
 
+    exit(0)
+
     # Components
     data_loader: BaseDataLoader = instantiate(config.data_loader)
-    logger.info(
-        f"Instantiated loader={data_loader.__class__.__name__} dataset={config.dataset.name}"
-    )
+    logger.info(f"Instantiated loader={data_loader.__class__.__name__} dataset={config.dataset.name}")
 
     # Prepare output dirs
     output_dir = Path(str(config.finetune.output_dir))
@@ -65,11 +65,7 @@ def main(config: DictConfig) -> None:
     trainer = FinetuneTrainer(plan)
 
     train_ds = TextSupervisedDataset(train_samples, trainer.tokenizer, max_length=int(config.finetune.max_seq_len))
-    eval_ds = (
-        TextSupervisedDataset(val_samples, trainer.tokenizer, max_length=int(config.finetune.max_seq_len))
-        if val_samples
-        else None
-    )
+    eval_ds = TextSupervisedDataset(val_samples, trainer.tokenizer, max_length=int(config.finetune.max_seq_len)) if val_samples else None
 
     hparams = FinetuneHyperParams(
         num_epochs=int(config.finetune.num_epochs),
