@@ -2,7 +2,7 @@ import os
 from typing import cast
 
 from google.genai.client import Client
-from google.genai.types import Part
+from google.genai.types import Part, GenerateContentConfig
 from loguru import logger
 
 from opengvl.clients.base import BaseModelClient
@@ -32,7 +32,7 @@ class GeminiClient(BaseModelClient):
                 contents.append(Part.from_bytes(data=encode_image(img), mime_type="image/png"))
 
         logger.debug(f"Contents length: {len(contents)} parts")
-        response = self.client.models.generate_content(model=self.model_name, contents=contents, temperature=temperature)
+        response = self.client.models.generate_content(model=self.model_name, contents=contents, config=GenerateContentConfig(temperature=temperature))
         if response.text is None:
             raise RuntimeError()
         return response.text

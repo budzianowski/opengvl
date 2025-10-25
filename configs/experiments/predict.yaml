@@ -2,6 +2,7 @@ defaults:
   - dataset: nyudoor
   - data_loader: huggingface
   - model: gemma
+  - mapper: gemini
   - prompts: default
   - prompt_phrases: default
   - _self_
@@ -15,18 +16,23 @@ dataset:
 prediction:
   num_examples: 50   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
-  output_dir: ${hydra:run.dir}/${hydra:job.num}/predictions
-  temperature: 0  # Sampling temperature for generation
+  output_dir: ${hydra:run.dir}
+  temperature: 0.75  # Sampling temperature for generation
+
+
+mapper:
+  max_new_tokens: 1024
+  temperature: 0.75
+  retries: 3
+
 
 hydra:
   mode: MULTIRUN # comment this if you don't want to sweep
   run:
-    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-predict
+    dir: results/
   sweep:
     dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-predict
     subdir: ${hydra.job.num}
   sweeper:
     params:
       dataset.num_context_episodes: 0
-  # Rely on config_path and defaults; no extra search paths required
-

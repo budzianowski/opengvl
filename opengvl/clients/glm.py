@@ -24,6 +24,7 @@ class GLMClient(BaseModelClient):
             device_map="auto",
             trust_remote_code=True,
         )
+        self.model_name = model_id
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         logger.info(type(self.processor))
 

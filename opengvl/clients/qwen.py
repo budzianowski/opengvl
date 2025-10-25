@@ -1,7 +1,4 @@
 from typing import cast
-
-import rpm
-
 import torch
 from loguru import logger
 from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
@@ -20,6 +17,7 @@ class QwenClient(BaseModelClient):
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, torch_dtype="auto", device_map="auto")
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         logger.info(type(self.processor))
+        self.model_name = model_id
 
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         messages = [{"role": "user", "content": []}]

@@ -1,0 +1,5 @@
+_target_: opengvl.mapper.gemini_mapper.GeminiMapper
+model_name: gemini-2.5-flash
+max_new_tokens: 1024
+temperature: 0.75
+retries: 3
