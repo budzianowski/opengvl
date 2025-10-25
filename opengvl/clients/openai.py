@@ -15,15 +15,15 @@ from opengvl.utils.images import encode_image
 class OpenAIClient(BaseModelClient):
     """OpenAI client wrapping the Responses API for image+text prompting."""
 
-    def __init__(self, model_id: str = "gpt-4o-mini", detail: str = "high", rpm: float = 0.0):
+    def __init__(self, model_name: str = "gpt-4o-mini", detail: str = "high", rpm: float = 0.0):
         super().__init__(rpm=rpm)
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise OSError()
         self.client = openai.OpenAI(api_key=api_key)
-        self.model_name = model_id
+        self.model_name = model_name
         self.detail = detail
-        logger.info(f"Using OpenAI model {self.model_id}")
+        logger.info(f"Using OpenAI model {self.model_name}")
 
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         content = []
@@ -43,7 +43,7 @@ class OpenAIClient(BaseModelClient):
 
         messages = [{"role": "user", "content": content}]
         response = self.client.responses.create(
-            model=self.model_id,
+            model=self.model_name,
             input=messages,  # type: ignore[arg-type]
             max_output_tokens=MAX_TOKENS_TO_GENERATE,
             temperature=temperature,

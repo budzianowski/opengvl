@@ -11,13 +11,13 @@ from qwen_vl_utils import process_vision_info
 
 
 class QwenClient(BaseModelClient):
-    def __init__(self, model_id: str = "Qwen/Qwen2.5-VL-3B-Instruct", rpm: float = 0.0):
+    def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", rpm: float = 0.0):
         super().__init__(rpm=rpm)
-        logger.info(f"Loading Qwen model {model_id}...")
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, torch_dtype="auto", device_map="auto")
-        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        logger.info(f"Loading Qwen model {model_name}...")
+        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
+        self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
         logger.info(type(self.processor))
-        self.model_name = model_id
+        self.model_name = model_name
 
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         messages = [{"role": "user", "content": []}]

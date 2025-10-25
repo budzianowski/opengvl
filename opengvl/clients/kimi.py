@@ -14,19 +14,19 @@ from opengvl.utils.images import to_pil
 class KimiThinkingClient(BaseModelClient):
     """Client for Kimi Thinking VL model."""
 
-    def __init__(self, model_id: str = "moonshotai/Kimi-VL-A3B-Thinking-2506", rpm: float = 0.0):
+    def __init__(self, model_name: str = "moonshotai/Kimi-VL-A3B-Thinking-2506", rpm: float = 0.0):
         super().__init__(rpm=rpm)
-        logger.info(f"Loading Kimi Thinking model {model_id} ...")
+        logger.info(f"Loading Kimi Thinking model {model_name} ...")
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_id,
+            model_name,
             torch_dtype="auto",
             device_map="auto",
             trust_remote_code=True,
         )
-        self.model_name = model_id
-        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        self.model_name = model_name
+        self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
 
-    def _generate_from_events(self, events: list[Event]) -> str:
+    def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         images = []
         messages = [{"role": "user", "content": []}]
         for ev in events:
@@ -57,7 +57,7 @@ class KimiThinkingClient(BaseModelClient):
                 MAX_TOKENS_TO_GENERATE,
                 32768,
             ),
-            temperature=0.8,
+            temperature=temperature,
         )
         trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids, strict=False)]
         return self.processor.batch_decode(trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]

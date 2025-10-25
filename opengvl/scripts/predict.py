@@ -38,6 +38,7 @@ def main(config: DictConfig) -> None:
     client: BaseModelClient = instantiate(config.model)
     mapper: BaseMapper = instantiate(config.mapper)
     prompt_template: str = config.prompts.template
+    
     logger.info(
         f"Instantiated components | dataset={config.dataset.name} loader={data_loader.__class__.__name__} "
         f"model={client.__class__.__name__} prompt_template_chars={len(prompt_template)}"
@@ -48,7 +49,7 @@ def main(config: DictConfig) -> None:
     output_dir = Path(str(config.prediction.output_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
     model_name_safe = client.model_name.replace("/", "_")
-    starting_time = datetime.now().isoformat()
+    starting_time = datetime.now().strftime('%Y%m%d_%H%M%S')
     jsonl_path = output_dir / f"{model_name_safe}_{starting_time}_predictions.jsonl"
 
     examples = infer_utils.load_fewshot_examples(data_loader, num_examples, config.dataset.name)

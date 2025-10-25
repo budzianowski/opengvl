@@ -1,7 +1,5 @@
 from typing import cast
 
-import rpm
-
 import torch
 from loguru import logger
 from transformers import AutoProcessor, Glm4vForConditionalGeneration
@@ -15,17 +13,17 @@ from opengvl.utils.images import to_pil
 class GLMClient(BaseModelClient):
     """GLM client implementation"""
 
-    def __init__(self, model_id: str = "zai-org/GLM-4.1V-9B-Thinking", rpm: float = 0.0):
+    def __init__(self, model_name: str = "zai-org/GLM-4.1V-9B-Thinking", rpm: float = 0.0):
         super().__init__(rpm=rpm)
-        logger.info(f"Loading GLM model {model_id}...")
+        logger.info(f"Loading GLM model {model_name}...")
         self.model = Glm4vForConditionalGeneration.from_pretrained(
-            model_id,
+            model_name,
             torch_dtype="auto",
             device_map="auto",
             trust_remote_code=True,
         )
-        self.model_name = model_id
-        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
+        self.model_name = model_name
+        self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
         logger.info(type(self.processor))
 
 
@@ -37,7 +35,7 @@ class GLMClient(BaseModelClient):
                 messages[0]["content"].append({"type": "text", "text": ev.text})
             elif isinstance(ev, ImageEvent):
                 messages[0]["content"].append({"type": "image"})
-                images.append(self._to_pil(cast(ImageT, ev.image)))
+                images.append(to_pil(cast(ImageT, ev.image)))
 
 
         prompt = self.processor.apply_chat_template(

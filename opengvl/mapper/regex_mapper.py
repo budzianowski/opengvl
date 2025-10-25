@@ -9,7 +9,7 @@ class RegexMapper(BaseMapper):
         super().__init__()
         self.PERCENT_FLOAT_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*%")
 
-    def extract_percentages(self, model_response: str) -> list[float]:
+    def extract_percentages(self, model_response: str) -> list[int]:
         """Extract percentages in order of appearance and return integers.
 
         - Accepts both integer and floating-point percentages in the input text.

@@ -13,12 +13,12 @@ from opengvl.utils.images import to_pil
 class GemmaClient(BaseModelClient):
     """Client for Gemma 3 image-text model (conditional generation)."""
 
-    def __init__(self, model_id: str = "google/gemma-3-4b-it", rpm: float = 0.0):
+    def __init__(self, model_name: str = "google/gemma-3-4b-it", rpm: float = 0.0):
         super().__init__(rpm=rpm)
-        logger.info(f"Loading Gemma model {model_id} ...")
-        self.model = Gemma3ForConditionalGeneration.from_pretrained(model_id, device_map="auto").eval()
-        self.model_name = model_id
-        self.processor = AutoProcessor.from_pretrained(model_id)
+        logger.info(f"Loading Gemma model {model_name} ...")
+        self.model = Gemma3ForConditionalGeneration.from_pretrained(model_name, device_map="auto").eval()
+        self.model_name = model_name
+        self.processor = AutoProcessor.from_pretrained(model_name)
         logger.info(type(self.processor))
 
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
