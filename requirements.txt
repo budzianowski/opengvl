@@ -15,3 +15,4 @@ transformers>=4.53.0
 google-genai>=1.22.0
 
 black>=24.10.0 
+wandb>=0.17.0

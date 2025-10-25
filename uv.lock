@@ -1395,6 +1395,7 @@ dependencies = [
     { name = "torch" },
     { name = "torchvision" },
     { name = "transformers" },
+    { name = "wandb" },
 ]
 
 [package.optional-dependencies]
@@ -1441,6 +1442,7 @@ requires-dist = [
     { name = "torch", specifier = ">=2.7.1" },
     { name = "torchvision", specifier = ">=0.22.1" },
     { name = "transformers", specifier = ">=4.53.0" },
+    { name = "wandb", specifier = ">=0.22.1" },
 ]
 provides-extras = ["closed"]
 

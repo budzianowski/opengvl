@@ -29,7 +29,7 @@
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
     - [Environment Variables](#environment-variables)
-  - [VLM Input, Output, and Few-Shot Learning](#vlm-input-output-and-few-shot-learning)
+  - [VLM Input, Output, and Few-Shot Inference](#vlm-input-output-and-few-shot-inference)
   - [Running with Apptainer/Singularity](#running-with-apptainersingularity)
   - [Configuration (Hydra)](#configuration-hydra)
   - [Extending OpenGVL](#extending-opengvl)
@@ -111,7 +111,7 @@ HUGGING_FACE_HUB_TOKEN="your-hugging-face-token"
 
 ---
 
-## VLM Input, Output, and Few-Shot Learning
+## VLM Input, Output, and Few-Shot Inference
 
 Each prediction uses:
 1) A prompt constructed from a template (e.g., `configs/prompts/concise.yaml`) plus dataset-specific instructions.
