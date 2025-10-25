@@ -5,6 +5,7 @@ defaults:
   - mapper: gemini
   - prompts: default
   - prompt_phrases: default
+  - mapping_prompts: default
   - _self_
 
 seed: 42          # Global seed (propagated to loader & any RNG-dependent logic)
@@ -19,12 +20,11 @@ prediction:
   output_dir: ${hydra:run.dir}
   temperature: 0.75  # Sampling temperature for generation
 
-
 mapper:
   max_new_tokens: 1024
   temperature: 0.75
   retries: 3
-
+  mapping_prompt: ${mapping_prompts}
 
 hydra:
   mode: MULTIRUN # comment this if you don't want to sweep
