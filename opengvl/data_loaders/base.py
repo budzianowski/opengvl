@@ -96,7 +96,7 @@ class BaseDataLoader(ABC):
         - Fills both original and shuffled completion rates
         """
         # # Deterministic per-episode RNG to ensure stable shuffles across runs
-        # per_ep_rng = np.random.default_rng(self.seed + int(episode_index))
+        per_ep_rng = np.random.default_rng(self.seed + int(episode_index))
 
         if len(frames) == 0:
             raise ValueError
@@ -111,9 +111,12 @@ class BaseDataLoader(ABC):
         original_completion = self._linear_completion(len(selected_frames))
 
         # Shuffled presentation order
-        shuffled_indices = self._maybe_shuffle(original_indices, rng=self._rng)
+        shuffled_indices = self._maybe_shuffle(original_indices, rng=per_ep_rng)
         shuffled_frames = [frames_np[i] for i in shuffled_indices]
-        shuffled_completion_approx = self._linear_completion(len(shuffled_frames))
+        shuffled_completion_approx = [
+            original_completion[original_indices.index(i)] for i in shuffled_indices
+        ]
+
 
         starting_frame = frames_np[original_indices[0]]
 

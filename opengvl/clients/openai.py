@@ -21,7 +21,7 @@ class OpenAIClient(BaseModelClient):
         if not api_key:
             raise OSError()
         self.client = openai.OpenAI(api_key=api_key)
-        self.model_id = model_id
+        self.model_name = model_id
         self.detail = detail
         logger.info(f"Using OpenAI model {self.model_id}")
 

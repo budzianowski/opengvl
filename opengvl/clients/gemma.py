@@ -17,6 +17,7 @@ class GemmaClient(BaseModelClient):
         super().__init__(rpm=rpm)
         logger.info(f"Loading Gemma model {model_id} ...")
         self.model = Gemma3ForConditionalGeneration.from_pretrained(model_id, device_map="auto").eval()
+        self.model_name = model_id
         self.processor = AutoProcessor.from_pretrained(model_id)
         logger.info(type(self.processor))
 
