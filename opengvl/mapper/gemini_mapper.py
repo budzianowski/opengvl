@@ -29,7 +29,6 @@ class GeminiMapper(BaseMapper):
         Returns:
             A list of extracted percentages as floats.
         """
-        print(f"Mapping prompt: {self.mapping_prompt}")
         local_retries = self.retries
         for attempt in range(local_retries):
             try:
@@ -44,7 +43,7 @@ class GeminiMapper(BaseMapper):
                 )
 
                 response_content = response.text
-                print(f"Raw response content: {response_content}")
+    
                 if "```json\n" in response_content:
                     response_content = response_content.split("```json\n")[1]
                 if "\n```" in response_content:
