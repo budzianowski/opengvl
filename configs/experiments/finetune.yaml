@@ -1,0 +1,39 @@
+defaults:
+	- dataset: nyudoor
+	- data_loader: huggingface
+	- model: gemma_finetune
+	- prompts: rigorous
+	- _self_
+
+seed: 2137
+shuffle: true
+
+dataset:
+	num_context_episodes: 0  # finetune on eval episodes only by default
+
+finetune:
+	num_train_examples: 64
+	num_val_examples: 16
+	max_seq_len: 1024
+	batch_size: 2
+	num_epochs: 1
+	lr: 5e-5
+	weight_decay: 0.01
+	warmup_ratio: 0.03
+	gradient_accumulation_steps: 8
+	logging_steps: 10
+	eval_steps: 50
+	save_steps: 100
+	early_stopping_patience: 3
+	gradient_checkpointing: false
+		bf16: true
+		wandb_project: opengvl
+		wandb_run_name: finetune-${now:%H-%M-%S}
+	output_dir: ${hydra:run.dir}/finetune
+
+hydra:
+	run:
+		dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}-finetune
+	sweep:
+		dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-finetune
+		subdir: ${hydra.job.num}

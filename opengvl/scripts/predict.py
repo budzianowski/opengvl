@@ -26,7 +26,7 @@ from opengvl.utils import inference as infer_utils
 from opengvl.mapper.base import BaseMapper
 
 
-@hydra.main(version_base=None, config_path="../../configs", config_name="experiments/predict")
+@hydra.main(version_base=None)
 def main(config: DictConfig) -> None:
     """Main prediction script entry point."""
     infer_utils.validate_prediction_config(config)
