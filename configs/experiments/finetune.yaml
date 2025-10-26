@@ -47,3 +47,15 @@ hydra:
   sweeper:
     params:
       dataset.num_context_episodes: 0
+
+  searchpath:
+    - file://configs
+    - file://configs/experiments
+    - file://configs/dataset
+    - file://configs/data_loader
+    - file://configs/model
+    - file://configs/mapper
+    - file://configs/prompts
+    - file://configs/prompt_phrases
+    - file://configs/mapping_prompts
+    - file://configs/wandb

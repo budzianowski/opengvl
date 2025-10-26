@@ -6,13 +6,13 @@ from typing import Any
 
 import numpy as np
 import torch
-import wandb
 from loguru import logger
 from omegaconf import DictConfig
 from PIL import Image
 from torch.utils.data import Dataset
 from transformers import AutoProcessor, EarlyStoppingCallback, Trainer, TrainingArguments
 
+import wandb
 from opengvl.utils.data_types import Episode, FewShotInput
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
