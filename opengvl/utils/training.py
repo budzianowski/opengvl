@@ -8,11 +8,13 @@ import numpy as np
 import torch
 import wandb
 from loguru import logger
+from omegaconf import DictConfig
 from PIL import Image
 from torch.utils.data import Dataset
 from transformers import AutoProcessor, EarlyStoppingCallback, Trainer, TrainingArguments
 
 from opengvl.utils.data_types import Episode, FewShotInput
+from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
 
 
@@ -32,6 +34,15 @@ class VLSample:
     prompt: str
     target: str
     images: list[np.ndarray]  # ImageNumpy alias; using np.ndarray here
+
+
+def validate_finetuning_config(config: DictConfig) -> None:
+    """Ensure required top-level keys are present for prediction runs.
+
+    This mirrors the previous local _validate_config in the script.
+    """
+    for key in ("dataset", "data_loader", "model", "prompts", "prediction"):
+        ensure_required_keys(config, key)
 
 
 def build_vl_samples(examples: list[FewShotInput], prompt_template: str) -> list[VLSample]:

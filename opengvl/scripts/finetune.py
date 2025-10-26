@@ -72,7 +72,7 @@ def main(config: DictConfig) -> None:
     logger.info(f"Sampled train={len(train_examples)} val={len(val_examples)} trajectories")
     logger.info("Building finetune samples...")
 
-    # VL-only training path (no text-only branch)
+    # VL-only training path
     wandb_project = getattr(config.finetune, "wandb_project", None)
     wandb_run_name = getattr(config.finetune, "wandb_run_name", None)
     model_identifier = str(config.model.get("model_id", config.model.get("model_name")))
