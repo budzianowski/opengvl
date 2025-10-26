@@ -13,8 +13,8 @@ shuffle: true       # Whether to shuffle frame presentation order
 
 
 finetune:
-  num_train_trajectories: 64
-  num_val_trajectories: 16
+  num_train_trajectories: 2
+  num_val_trajectories: 1
   max_seq_len: 2048
   batch_size: 2
   num_epochs: 3

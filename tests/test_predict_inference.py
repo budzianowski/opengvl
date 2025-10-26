@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import numpy as np
 
 from opengvl.metrics.voc import VOCMetric
-from opengvl.utils.data_types import Episode, Example
+from opengvl.utils.data_types import Episode, FewShotInput
 from opengvl.utils.inference import PercentagesNormalizationError, predict_on_fewshot_input
 
 
@@ -23,7 +23,7 @@ def make_dummy_episode(n_frames=3):
 
 
 def make_dummy_example(n_frames=3):
-    return Example(
+    return FewShotInput(
         eval_episode=make_dummy_episode(n_frames),
         context_episodes=[],
     )

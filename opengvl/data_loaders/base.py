@@ -5,13 +5,12 @@ import numpy as np
 from loguru import logger
 
 from opengvl.utils.aliases import ImageNumpy, ImageT
-from opengvl.utils.data_types import Episode
-from opengvl.utils.data_types import Example as FewShotInput
+from opengvl.utils.data_types import Episode, FewShotInput
 from opengvl.utils.images import to_numpy
 
 
 class BaseDataLoader(ABC):
-    """Abstract base for building Episode/Example structures.
+    """Abstract base for building Episode/FewShotInput structures.
 
     Subclasses should implement ``load_fewshot_input`` and optionally ``reset``.
     This base provides utility methods to transform raw frames into an

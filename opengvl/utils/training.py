@@ -17,7 +17,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from opengvl.utils.data_types import Episode, Example
+from opengvl.utils.data_types import Episode, FewShotInput
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
 
@@ -60,7 +60,7 @@ class FinetuneSample:
     target: str
 
 
-def build_finetune_samples(examples: Iterable[Example], prompt_template: str) -> list[FinetuneSample]:
+def build_finetune_samples(examples: Iterable[FewShotInput], prompt_template: str) -> list[FinetuneSample]:
     """Construct text-to-text finetune pairs from FewShot inputs.
 
     Input prompt: formatted using the provided template and the eval instruction.

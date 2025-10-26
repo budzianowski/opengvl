@@ -5,8 +5,7 @@ from lerobot.datasets.push_dataset_to_hub.utils import calculate_episode_data_in
 from loguru import logger
 
 from opengvl.data_loaders.base import BaseDataLoader
-from opengvl.utils.data_types import Episode
-from opengvl.utils.data_types import Example as FewShotInput
+from opengvl.utils.data_types import Episode, FewShotInput
 
 disable_progress_bar()
 

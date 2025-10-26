@@ -5,7 +5,7 @@ from loguru import logger
 from PIL import Image
 
 from opengvl.data_loaders.base import BaseDataLoader
-from opengvl.utils.data_types import Example as FewShotInput
+from opengvl.utils.data_types import FewShotInput
 
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
 
@@ -14,7 +14,7 @@ class LocalDataLoader(BaseDataLoader):
     """Load a single episode from local image files.
 
     By default, treats an entire directory (or an explicit list of files)
-    as one episode ordered by filename. The resulting Example contains the
+    as one episode ordered by filename. The resulting FewShotInput contains the
     eval episode and no context episodes.
     """
 

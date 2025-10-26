@@ -23,7 +23,7 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from opengvl.data_loaders.base import BaseDataLoader
-from opengvl.utils.data_types import Example as FewShotInput
+from opengvl.utils.data_types import FewShotInput
 from opengvl.utils.training import (
     FinetuneHyperParams,
     FinetunePlan,

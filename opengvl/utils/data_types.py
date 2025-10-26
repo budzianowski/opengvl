@@ -84,10 +84,10 @@ class InferredEpisode(Episode):
 
 
 @dataclass
-class Example:
+class FewShotInput:
     """
     Container for a single training/evaluation example consisting of one
-    evaluation episode and multiple context episodes.
+    evaluation episode and 0 or more context episodes.
     """
 
     eval_episode: Episode
@@ -99,7 +99,7 @@ class Example:
         ctx_frames_list = [len(ep.shuffled_frames) for ep in self.context_episodes]
         ctx_frames_total = sum(ctx_frames_list)
         return (
-            "Example("
+            "FewShotInput("
             f"eval_episode_index={self.eval_episode.episode_index}, "
             f"eval_frames={eval_frames}, "
             f"context_episodes={ctx_count}, "

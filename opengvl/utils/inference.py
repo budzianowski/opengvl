@@ -11,8 +11,7 @@ from opengvl.metrics.base import MetricResult
 from opengvl.metrics.voc import VOCMetric
 from opengvl.results.prediction import PredictionRecord
 from opengvl.utils.constants import N_DEBUG_PROMPT_CHARS
-from opengvl.utils.data_types import Example as FewShotInput
-from opengvl.utils.data_types import InferredEpisode, InferredFewShotResult
+from opengvl.utils.data_types import FewShotInput, InferredEpisode, InferredFewShotResult
 from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
@@ -143,5 +142,5 @@ def predict_on_fewshot_input(
         raw_response=response_text if save_raw else None,
         error_count=error_count,
     )
-    logger.info(f"Example {idx}: preds={len(predicted)}/{len(ex.eval_episode.shuffled_frames)} VOC={metric_res.value}")
+    logger.info(f"FewShotInput {idx}: preds={len(predicted)}/{len(ex.eval_episode.shuffled_frames)} VOC={metric_res.value}")
     return record
