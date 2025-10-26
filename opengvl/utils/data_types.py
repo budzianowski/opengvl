@@ -65,7 +65,9 @@ class InferredEpisode(Episode):
     """
 
     shuffled_frames_predicted_completion_rates: list[int]  # should be aligned 1:1 with shuffled_frames
-    # if not, that means that model failed to predict for all frames (e.g. returned incomplete list of preds)
+    # if not, that means that model failed to predict for all frames (e.g. returned incomplete list of preds
+    # or extractor failed to parse them all, for instance sometimes LLMs repeats percentages which makes parsing
+    # not obvious)
 
     @classmethod
     def from_predictions(cls, episode: Episode, predictions: list[int]) -> "InferredEpisode":
