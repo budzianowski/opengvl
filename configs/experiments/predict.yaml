@@ -1,7 +1,7 @@
 defaults:
   - dataset: nyudoor
   - data_loader: huggingface
-  - model: gemma
+  - model: qwen
   - mapper: gemini
   - prompts: default
   - prompt_phrases: default

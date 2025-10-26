@@ -12,13 +12,14 @@ from opengvl.utils.images import to_pil
 
 
 class QwenClient(BaseModelClient):
-    def __init__(self, model_name: str, rpm: float = 0.0):
+    def __init__(self, model_id: str, rpm: float = 0.0):
         super().__init__(rpm=rpm)
-        logger.info(f"Loading Qwen model {model_name}...")
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
-        self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+        logger.info(f"Loading Qwen model {model_id}...")
+        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, torch_dtype="auto", device_map="auto")
+        # model config
+        self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         logger.info(type(self.processor))
-        self.model_name = model_name
+        self.model_name = model_id
 
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         messages = [{"role": "user", "content": []}]

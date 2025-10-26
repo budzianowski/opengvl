@@ -1,3 +1,2 @@
 _target_: opengvl.clients.qwen.QwenClient
 model_id: Qwen/Qwen2.5-VL-3B-Instruct
-max_input_length: 32000
