@@ -7,7 +7,7 @@ HYDRA_TARGET_KEY = "_target_"
 def ensure_required_keys(cfg: DictConfig, *required_keys: str) -> None:
     """Validate that cfg contains all required keys under a given base path.
 
-    FewShotInput:
+    Example:
         ensure_required_keys(cfg, "data_loader")
 
     Raises KeyError with a helpful message when a key is missing.
