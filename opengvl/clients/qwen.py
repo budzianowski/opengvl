@@ -4,6 +4,7 @@ from loguru import logger
 from qwen_vl_utils import process_vision_info
 from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
+# from transformers.models.qwen2_5_vl.processing_qwen2_5_vl import Qwen2_5_VLProcessor
 from opengvl.clients.base import BaseModelClient
 from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
 from opengvl.utils.constants import MAX_TOKENS_TO_GENERATE
@@ -26,7 +27,8 @@ class QwenClient(BaseModelClient):
                 messages[0]["content"].append({"type": "text", "text": ev.text})
             elif isinstance(ev, ImageEvent):
                 messages[0]["content"].append({"type": "image", "image": to_pil(cast(ImageT, ev.image))})
-
+            else:
+                logger.warning(f"Unknown event type: {type(ev)}")
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         image_inputs, video_inputs = process_vision_info(messages)
 

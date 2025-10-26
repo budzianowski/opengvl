@@ -134,14 +134,17 @@ class FinetuneHyperParams:
     gradient_checkpointing: bool
     bf16: bool
 
+@dataclass
+class WandBConfig:
+    project: str
+    run_name: str
 
 @dataclass
 class FinetunePlan:
-    model_id: str
-    max_length: int
+    model_id: str # Model identifier from huggingface hub (or local path)
+    max_length: int # Maximum sequence length for input
     output_dir: str
-    wandb_project: str
-    wandb_run_name: str
+    wandb_config: WandBConfig | None = None
 
 
 class FinetuneTrainer:
