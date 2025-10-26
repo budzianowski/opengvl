@@ -16,6 +16,7 @@ from loguru import logger
 from omegaconf import DictConfig, OmegaConf
 
 from opengvl.data_loaders.base import BaseDataLoader
+from opengvl.utils.data_types import Example as FewShotInput
 from opengvl.utils.training import (
     FinetuneHyperParams,
     FinetunePlan,
@@ -33,8 +34,6 @@ def main(config: DictConfig) -> None:
     logger.info("Environment variables loaded (dotenv)")
     logger.info(f"Configuration:\n{OmegaConf.to_yaml(config)}")
 
-    exit(0)
-
     # Components
     data_loader: BaseDataLoader = instantiate(config.data_loader)
     logger.info(f"Instantiated loader={data_loader.__class__.__name__} dataset={config.dataset.name}")
@@ -44,13 +43,19 @@ def main(config: DictConfig) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Build datasets
-    n_train = int(config.finetune.num_train_examples)
-    n_val = int(config.finetune.num_val_examples)
+    n_train = int(config.finetune.num_train_trajectories)
+    n_val = int(config.finetune.num_val_trajectories)
     prompt_template: str = config.prompts.template
 
     logger.info(f"Sampling train={n_train} val={n_val} examples…")
-    train_examples = data_loader.load_fewshot_inputs(n_train)
-    val_examples = data_loader.load_fewshot_inputs(n_val) if n_val > 0 else []
+    train_examples: list[FewShotInput] = data_loader.load_fewshot_inputs(n_train)
+    val_examples: list[FewShotInput] = data_loader.load_fewshot_inputs(n_val) if n_val > 0 else []
+
+    if any((len(ex.context_episodes) > 0) for ex in train_examples):
+        logger.error("Finetuning with in-context examples is not supported. Please set num_context_episodes=0 in the data loader config.")
+
+    logger.info(f'Sampled train={len(train_examples)} val={len(val_examples)} trajectories')
+    logger.info("Building finetune samples…")
 
     train_samples = build_finetune_samples(train_examples, prompt_template)
     val_samples = build_finetune_samples(val_examples, prompt_template) if val_examples else []
@@ -58,9 +63,7 @@ def main(config: DictConfig) -> None:
     plan = FinetunePlan(
         model_id=str(config.model.model_id),
         max_length=int(config.finetune.max_seq_len),
-        output_dir=str(output_dir),
-        wandb_project=str(config.finetune.wandb_project),
-        wandb_run_name=str(config.finetune.wandb_run_name),
+        output_dir=str(output_dir)
     )
     trainer = FinetuneTrainer(plan)
 

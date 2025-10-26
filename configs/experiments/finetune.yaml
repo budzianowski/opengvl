@@ -1,7 +1,7 @@
 defaults:
   - dataset: nyudoor
   - data_loader: huggingface
-  - model: hf_causal
+  - model: qwen
   - mapper: gemini
   - prompts: default
   - prompt_phrases: default
@@ -9,23 +9,12 @@ defaults:
   - _self_
 
 seed: 42
+shuffle: true       # Whether to shuffle frame presentation order
 
-hydra:
-  mode: MULTIRUN # comment this if you don't want to sweep
-  searchpath:
-    - file://configs
-  run:
-    dir: results/
-  sweep:
-    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-finetune
-    subdir: ${hydra.job.num}
-  sweeper:
-    params:
-      dataset.num_context_episodes: 0
 
 finetune:
-  num_train_examples: 64
-  num_val_examples: 16
+  num_train_trajectories: 64
+  num_val_trajectories: 16
   max_seq_len: 1024
   batch_size: 2
   num_epochs: 1
@@ -42,3 +31,16 @@ finetune:
   wandb_project: opengvl
   wandb_run_name: finetune-${now:%H-%M-%S}
   output_dir: ${hydra:run.dir}/finetune
+
+hydra:
+  mode: MULTIRUN # comment this if you don't want to sweep
+  searchpath:
+    - file://configs
+  run:
+    dir: results/
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-finetune
+    subdir: ${hydra.job.num}
+  sweeper:
+    params:
+      dataset.num_context_episodes: 0
