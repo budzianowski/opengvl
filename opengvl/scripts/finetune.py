@@ -7,9 +7,16 @@ Steps:
 4. Initialize model/tokenizer and run training with callbacks & W&B.
 """
 
+from __future__ import annotations
+
+import random
+
+# pylint: disable=wrong-import-order,ungrouped-imports
 from pathlib import Path
 
 import hydra
+import numpy as np
+import torch
 from dotenv import load_dotenv
 from hydra.utils import instantiate
 from loguru import logger
@@ -22,6 +29,7 @@ from opengvl.utils.training import (
     FinetunePlan,
     FinetuneTrainer,
     TextSupervisedDataset,
+    WandBConfig,
     build_finetune_samples,
     validate_finetuning_config,
 )
@@ -33,6 +41,17 @@ def main(config: DictConfig) -> None:
     load_dotenv(override=True)
     logger.info("Environment variables loaded (dotenv)")
     logger.info(f"Configuration:\n{OmegaConf.to_yaml(config)}")
+
+    # Set seeds for reproducibility
+    seed = int(getattr(config, "seed", 42))
+    random.seed(seed)
+    np.random.seed(seed)
+    try:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    except Exception as exc:  # pragma: no cover - defensive only
+        logger.warning(f"Torch seeding failed: {exc}")
 
     # Components
     data_loader: BaseDataLoader = instantiate(config.data_loader)
@@ -47,23 +66,35 @@ def main(config: DictConfig) -> None:
     n_val = int(config.finetune.num_val_trajectories)
     prompt_template: str = config.prompts.template
 
-    logger.info(f"Sampling train={n_train} val={n_val} examples…")
+    logger.info(f"Sampling train={n_train} val={n_val} examples...")
     train_examples: list[FewShotInput] = data_loader.load_fewshot_inputs(n_train)
     val_examples: list[FewShotInput] = data_loader.load_fewshot_inputs(n_val) if n_val > 0 else []
 
     if any((len(ex.context_episodes) > 0) for ex in train_examples):
-        logger.error("Finetuning with in-context examples is not supported. Please set num_context_episodes=0 in the data loader config.")
+        raise ValueError(
+            "Finetuning with in-context examples is not supported. Please set dataset.num_context_episodes=0 in the config."
+        )
 
     logger.info(f'Sampled train={len(train_examples)} val={len(val_examples)} trajectories')
-    logger.info("Building finetune samples…")
+    logger.info("Building finetune samples...")
 
     train_samples = build_finetune_samples(train_examples, prompt_template)
     val_samples = build_finetune_samples(val_examples, prompt_template) if val_examples else []
 
+    # Optional W&B configuration
+    wb_cfg: WandBConfig | None = None
+    wandb_project = getattr(config.finetune, "wandb_project", None)
+    wandb_run_name = getattr(config.finetune, "wandb_run_name", None)
+    if wandb_project and wandb_run_name:
+        wb_cfg = WandBConfig(project=str(wandb_project), run_name=str(wandb_run_name))
+
+    # Accept either model_id or model_name from the model config
+    model_identifier = str(config.model.get("model_id", config.model.get("model_name")))
     plan = FinetunePlan(
-        model_id=str(config.model.model_id),
+        model_id=model_identifier,
         max_length=int(config.finetune.max_seq_len),
-        output_dir=str(output_dir)
+        output_dir=str(output_dir),
+        wandb_config=wb_cfg,
     )
     trainer = FinetuneTrainer(plan)
 
@@ -83,6 +114,9 @@ def main(config: DictConfig) -> None:
         early_stopping_patience=int(config.finetune.early_stopping_patience),
         gradient_checkpointing=bool(config.finetune.gradient_checkpointing),
         bf16=bool(config.finetune.bf16),
+        lr_scheduler_type=str(getattr(config.finetune, "lr_scheduler_type", "cosine")),
+        max_grad_norm=float(getattr(config.finetune, "max_grad_norm", 1.0)),
+        save_total_limit=int(getattr(config.finetune, "save_total_limit", 2)),
     )
 
     logger.info("Launching training")

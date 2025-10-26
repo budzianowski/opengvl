@@ -15,19 +15,22 @@ shuffle: true       # Whether to shuffle frame presentation order
 finetune:
   num_train_trajectories: 64
   num_val_trajectories: 16
-  max_seq_len: 1024
+  max_seq_len: 2048
   batch_size: 2
-  num_epochs: 1
-  lr: 5e-5
+  num_epochs: 3
+  lr: 2e-5
   weight_decay: 0.01
   warmup_ratio: 0.03
   gradient_accumulation_steps: 8
   logging_steps: 10
   eval_steps: 50
-  save_steps: 100
+  save_steps: 200
   early_stopping_patience: 3
-  gradient_checkpointing: false
+  gradient_checkpointing: true
   bf16: true
+  lr_scheduler_type: cosine
+  max_grad_norm: 1.0
+  save_total_limit: 2
   wandb_project: opengvl
   wandb_run_name: finetune-${now:%H-%M-%S}
   output_dir: ${hydra:run.dir}/finetune

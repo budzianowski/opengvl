@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import wandb
 from loguru import logger
@@ -81,7 +82,14 @@ class TextSupervisedDataset(Dataset):
     The loss is computed only on the target portion (after the special answer prefix).
     """
 
-    def __init__(self, samples: list[FinetuneSample], tokenizer, *, max_length: int = 1024, answer_prefix: str = "\nAnswer: ") -> None:
+    def __init__(
+        self,
+        samples: list[FinetuneSample],
+        tokenizer: Any,
+        *,
+        max_length: int = 1024,
+        answer_prefix: str = "\nAnswer: ",
+    ) -> None:
         self.samples = samples
         self.tokenizer = tokenizer
         self.max_length = int(max_length)
@@ -90,7 +98,7 @@ class TextSupervisedDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> dict:
+    def __getitem__(self, idx: int) -> dict[str, list[int]]:
         s = self.samples[idx]
         # Compose full text: [prompt][answer_prefix][target]
         full = s.prompt + self.answer_prefix + s.target
@@ -102,11 +110,13 @@ class TextSupervisedDataset(Dataset):
             return_tensors=None,
         )
         # Build labels such that only target tokens contribute to loss
-        # Identify prefix length in tokens
-        with self.tokenizer.as_target_tokenizer():
-            prefix_len = len(self.tokenizer(s.prompt + self.answer_prefix, add_special_tokens=False)["input_ids"])  # type: ignore[index]
+        # Identify prefix length in tokens by re-encoding the prompt+prefix only
+        prefix_ids: list[int] = self.tokenizer(
+            s.prompt + self.answer_prefix, add_special_tokens=False
+        )["input_ids"]
+        prefix_len = len(prefix_ids)
         input_ids = tokenized["input_ids"]
-        labels = [-100] * len(input_ids)
+        labels: list[int] = [-100] * len(input_ids)
         for i in range(prefix_len, len(labels)):
             labels[i] = input_ids[i]
         tokenized["labels"] = labels
@@ -133,6 +143,10 @@ class FinetuneHyperParams:
     early_stopping_patience: int
     gradient_checkpointing: bool
     bf16: bool
+    # Optional but useful knobs with sensible defaults
+    lr_scheduler_type: str = "cosine"
+    max_grad_norm: float = 1.0
+    save_total_limit: int = 2
 
 @dataclass
 class WandBConfig:
@@ -141,8 +155,8 @@ class WandBConfig:
 
 @dataclass
 class FinetunePlan:
-    model_id: str # Model identifier from huggingface hub (or local path)
-    max_length: int # Maximum sequence length for input
+    model_id: str  # Model identifier from huggingface hub (or local path)
+    max_length: int  # Maximum sequence length for input
     output_dir: str
     wandb_config: WandBConfig | None = None
 
@@ -153,16 +167,27 @@ class FinetuneTrainer:
     def __init__(self, plan: FinetunePlan) -> None:
         self.plan = plan
         logger.info(f"Loading tokenizer and model: {plan.model_id}")
-        self.tokenizer = AutoTokenizer.from_pretrained(plan.model_id, use_fast=True)
+        # Qwen models often rely on custom code, so trust_remote_code should be True.
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            plan.model_id, use_fast=True, trust_remote_code=True
+        )
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model = AutoModelForCausalLM.from_pretrained(plan.model_id)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            plan.model_id, trust_remote_code=True
+        )
 
-    def train(self, train_ds: Dataset, eval_ds: Dataset | None, hparams: FinetuneHyperParams) -> FinetuneArtifacts:
+    def train(
+        self, train_ds: Dataset, eval_ds: Dataset | None, hparams: FinetuneHyperParams
+    ) -> FinetuneArtifacts:
         logger.info("Preparing data collator and training arguments")
         data_collator = DataCollatorForLanguageModeling(tokenizer=self.tokenizer, mlm=False)
 
-        args_kwargs: dict[str, str | int | bool | float | list[str] | None] = {
+        # Disable use_cache to avoid incompatible state with gradient checkpointing
+        if hparams.gradient_checkpointing and hasattr(self.model.config, "use_cache"):
+            self.model.config.use_cache = False  # type: ignore[attr-defined]
+
+        args_kwargs: dict[str, Any] = {
             "output_dir": self.plan.output_dir,
             "num_train_epochs": hparams.num_epochs,
             "per_device_train_batch_size": hparams.batch_size,
@@ -175,12 +200,18 @@ class FinetuneTrainer:
             "gradient_accumulation_steps": hparams.gradient_accumulation_steps,
             "gradient_checkpointing": hparams.gradient_checkpointing,
             "bf16": hparams.bf16,
-            "report_to": ["wandb"],
-            "save_total_limit": 2,
+            "save_total_limit": hparams.save_total_limit,
+            "lr_scheduler_type": hparams.lr_scheduler_type,
+            "max_grad_norm": hparams.max_grad_norm,
             "load_best_model_at_end": bool(eval_ds is not None),
             "metric_for_best_model": "eval_loss",
             "greater_is_better": False,
         }
+        # Only report to W&B if configured
+        if self.plan.wandb_config is not None:
+            args_kwargs["report_to"] = ["wandb"]
+        else:
+            args_kwargs["report_to"] = []
         if eval_ds is not None:
             args_kwargs["evaluation_strategy"] = "steps"
             args_kwargs["eval_steps"] = hparams.eval_steps
@@ -191,10 +222,19 @@ class FinetuneTrainer:
         if eval_ds is not None and hparams.early_stopping_patience > 0:
             callbacks.append(EarlyStoppingCallback(early_stopping_patience=hparams.early_stopping_patience))
 
-        # Initialize W&B with a concise config derived from dataclasses
-        wb_cfg = {**asdict(self.plan), **asdict(hparams)}
-        wandb.init(project=self.plan.wandb_project, name=self.plan.wandb_run_name, config=wb_cfg)
-        logger.info("Weights & Biases logging is enabled")
+        # Initialize W&B with a concise config derived from dataclasses if requested
+        if self.plan.wandb_config is not None:
+            wb_cfg: dict[str, Any] = {**asdict(self.plan), **asdict(hparams)}
+            # Remove nested objects that W&B can't serialize easily
+            wb_cfg.pop("wandb_config", None)
+            wandb.init(
+                project=self.plan.wandb_config.project,
+                name=self.plan.wandb_config.run_name,
+                config=wb_cfg,
+            )
+            logger.info("Weights & Biases logging is enabled")
+        else:
+            logger.info("W&B logging disabled (no wandb_config provided)")
 
         trainer = Trainer(
             model=self.model,
