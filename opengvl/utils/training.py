@@ -2,19 +2,21 @@ from __future__ import annotations
 
 # pylint: disable=wrong-import-order,ungrouped-imports
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
 from loguru import logger
 from omegaconf import DictConfig
-from PIL import Image
+from qwen_vl_utils import process_vision_info
 from torch.utils.data import Dataset
 from transformers import AutoProcessor, EarlyStoppingCallback, Trainer, TrainingArguments
 
 import wandb
+from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
 from opengvl.utils.data_types import Episode, FewShotInput
 from opengvl.utils.hydra import ensure_required_keys
+from opengvl.utils.images import to_pil
 from opengvl.utils.prompts import format_prompt
 
 
@@ -34,6 +36,13 @@ class VLSample:
     prompt: str
     target: str
     images: list[np.ndarray]  # ImageNumpy alias; using np.ndarray here
+
+    def to_events(self) -> list[Event]:
+        """Convert this sample to a list of Events for consistent formatting."""
+        events: list[Event] = [TextEvent(self.prompt)]
+        for img in self.images:
+            events.append(ImageEvent(img))
+        return events
 
 
 def validate_finetuning_config(config: DictConfig) -> None:
@@ -59,13 +68,22 @@ def build_vl_samples(examples: list[FewShotInput], prompt_template: str) -> list
     return samples
 
 
-def _to_pil(img: np.ndarray) -> Image.Image:
-    if isinstance(img, Image.Image):
-        return img
-    arr = np.clip(img, 0, 255).astype(np.uint8) if img.dtype != np.uint8 else img
-    if arr.ndim == 2:
-        return Image.fromarray(arr, mode="L")
-    return Image.fromarray(arr)
+def _events_to_qwen_messages(events: list[Event]) -> list[dict[str, Any]]:
+    """Convert Event list to Qwen message format, exactly like QwenClient does.
+    
+    This function replicates the logic from QwenClient._generate_from_events
+    to ensure training data is formatted identically to inference.
+    """
+    messages = [{"role": "user", "content": []}]
+    for ev in events:
+        if isinstance(ev, TextEvent):
+            if ev.text:  # Skip empty text events
+                messages[0]["content"].append({"type": "text", "text": ev.text})
+        elif isinstance(ev, ImageEvent):
+            messages[0]["content"].append({"type": "image", "image": to_pil(cast(ImageT, ev.image))})
+        else:
+            logger.warning(f"Unknown event type: {type(ev)}")
+    return messages
 
 
 class QwenVLSupervisedDataset(Dataset):
@@ -80,40 +98,43 @@ class QwenVLSupervisedDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
         s = self.samples[idx]
-        pil_images = [_to_pil(im) for im in s.images]
 
-        # Build a single-turn conversation: user provides prompt + N frames, assistant provides target string
-        user_content: list[dict[str, str | Image.Image]] = [{"type": "text", "text": s.prompt}]
-        for i, im in enumerate(pil_images, start=1):
-            user_content.append({"type": "text", "text": f"\nFrame {i}:"})
-            user_content.append({"type": "image", "image": im})
+        # Build events exactly like the base client does, then convert to Qwen messages
+        user_events = s.to_events()
+        user_messages = _events_to_qwen_messages(user_events)
 
-        user_only = [{"role": "user", "content": user_content}]
-        messages = [*user_only, {"role": "assistant", "content": [{"type": "text", "text": s.target}]}]
+        # Add assistant response
+        messages = [*user_messages, {"role": "assistant", "content": [{"type": "text", "text": s.target}]}]
 
-        # Build text strings via chat template, then process images+text together
+
         full_text: str = self.processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
-        user_text: str = self.processor.apply_chat_template(user_only, add_generation_prompt=False, tokenize=False)
+        user_text: str = self.processor.apply_chat_template(user_messages, add_generation_prompt=False, tokenize=False)
 
-        full_proc = self.processor(text=full_text, images=pil_images, return_tensors=None)
-        user_proc = self.processor(text=user_text, images=pil_images, return_tensors=None)
+        # Use process_vision_info to extract images like in the client
+        image_inputs, video_inputs = process_vision_info(messages) # type: ignore[arg-type]
+
+        full_proc = self.processor(text=full_text, images=image_inputs, videos=video_inputs, return_tensors=None)
+        user_proc = self.processor(text=user_text, images=image_inputs, videos=video_inputs, return_tensors=None)
 
         input_ids = full_proc["input_ids"]
         attention_mask = full_proc.get("attention_mask")
         pixel_values = full_proc.get("pixel_values")
-        # pixel_values should be present; processor handles image normalization/resize
+        image_grid_thw = full_proc.get("image_grid_thw")
 
         prefix_len = len(user_proc["input_ids"])
         labels = [-100] * len(input_ids)
         for i in range(prefix_len, len(labels)):
             labels[i] = input_ids[i]
 
-        return {
+        result = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
             "pixel_values": pixel_values,
             "labels": labels,
         }
+        if image_grid_thw is not None:
+            result["image_grid_thw"] = image_grid_thw
+        return result
 
 
 class QwenVLDataCollator:
