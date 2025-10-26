@@ -41,7 +41,10 @@ def validate_finetuning_config(config: DictConfig) -> None:
 
     This mirrors the previous local _validate_config in the script.
     """
-    for key in ("dataset", "data_loader", "model", "prompts", "prediction"):
+    for key in ("dataset", "data_loader", "model",
+                "mapper", "prompts", "prompt_phrases",
+                "mapping_prompts", "finetune", "seed",
+                "shuffle"):
         ensure_required_keys(config, key)
 
 
@@ -218,7 +221,8 @@ class QwenVLFinetuneTrainer:
             load_best_model_at_end=bool(eval_ds is not None),
             metric_for_best_model="eval_loss",
             greater_is_better=False,
-            evaluation_strategy="steps" if eval_ds is not None else "no",
+            eval_strategy="epoch" if eval_ds is not None else "no",
+            save_strategy="epoch",
             eval_steps=hparams.eval_steps if eval_ds is not None else None,
             report_to=["wandb"] if (self.plan.wandb_project and self.plan.wandb_run_name) else [],
         )

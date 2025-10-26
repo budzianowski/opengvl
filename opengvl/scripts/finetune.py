@@ -1,14 +1,3 @@
-"""Finetuning script using HF Transformers Trainer.
-
-Steps:
-1. Instantiate data loader via Hydra.
-2. Sample train/val FewShotInput examples.
-3. Build text-supervised datasets from examples.
-4. Initialize model/tokenizer and run training with callbacks & W&B.
-"""
-
-from __future__ import annotations
-
 import random
 
 # pylint: disable=wrong-import-order,ungrouped-imports
