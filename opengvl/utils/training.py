@@ -48,7 +48,7 @@ def _true_completion_for_shuffled(episode: Episode) -> list[int]:
         zip(
             episode.original_frames_indices,
             episode.original_frames_task_completion_rates,
-            strict=False,
+            strict=True,
         )
     )
     return [int(idx_to_rate[i]) for i in episode.shuffled_frames_indices]
