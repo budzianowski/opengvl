@@ -112,7 +112,7 @@ class TextSupervisedDataset(Dataset):
         # Build labels such that only target tokens contribute to loss
         # Identify prefix length in tokens by re-encoding the prompt+prefix only
         prefix_ids: list[int] = self.tokenizer(
-            s.prompt + self.answer_prefix, add_special_tokens=False
+            s.prompt + self.answer_prefix, add_special_tokens=True
         )["input_ids"]
         prefix_len = len(prefix_ids)
         input_ids = tokenized["input_ids"]
