@@ -24,14 +24,13 @@ from omegaconf import DictConfig, OmegaConf
 
 from opengvl.data_loaders.base import BaseDataLoader
 from opengvl.utils.data_types import FewShotInput
+from opengvl.utils.training import validate_finetuning_config
 from opengvl.utils.training import (
-    FinetuneHyperParams,
-    FinetunePlan,
-    FinetuneTrainer,
-    TextSupervisedDataset,
-    WandBConfig,
-    build_finetune_samples,
-    validate_finetuning_config,
+    QwenVLFinetuneTrainer,
+    QwenVLSupervisedDataset,
+    VLFineTuneHyperParams,
+    VLFineTunePlan,
+    build_vl_samples,
 )
 
 
@@ -46,12 +45,9 @@ def main(config: DictConfig) -> None:
     seed = int(getattr(config, "seed", 42))
     random.seed(seed)
     np.random.seed(seed)
-    try:
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
-    except Exception as exc:  # pragma: no cover - defensive only
-        logger.warning(f"Torch seeding failed: {exc}")
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
     # Components
     data_loader: BaseDataLoader = instantiate(config.data_loader)
@@ -78,30 +74,28 @@ def main(config: DictConfig) -> None:
     logger.info(f'Sampled train={len(train_examples)} val={len(val_examples)} trajectories')
     logger.info("Building finetune samples...")
 
-    train_samples = build_finetune_samples(train_examples, prompt_template)
-    val_samples = build_finetune_samples(val_examples, prompt_template) if val_examples else []
 
-    # Optional W&B configuration
-    wb_cfg: WandBConfig | None = None
+
+
+
+    # VL-only training path (no text-only branch)
     wandb_project = getattr(config.finetune, "wandb_project", None)
     wandb_run_name = getattr(config.finetune, "wandb_run_name", None)
-    if wandb_project and wandb_run_name:
-        wb_cfg = WandBConfig(project=str(wandb_project), run_name=str(wandb_run_name))
-
-    # Accept either model_id or model_name from the model config
     model_identifier = str(config.model.get("model_id", config.model.get("model_name")))
-    plan = FinetunePlan(
+
+    vl_plan = VLFineTunePlan(
         model_id=model_identifier,
-        max_length=int(config.finetune.max_seq_len),
         output_dir=str(output_dir),
-        wandb_config=wb_cfg,
+        wandb_project=str(wandb_project) if wandb_project else None,
+        wandb_run_name=str(wandb_run_name) if wandb_run_name else None,
     )
-    trainer = FinetuneTrainer(plan)
+    vl_trainer = QwenVLFinetuneTrainer(vl_plan)
+    train_vl_samples = build_vl_samples(train_examples, prompt_template)
+    val_vl_samples = build_vl_samples(val_examples, prompt_template) if val_examples else []
+    train_ds = QwenVLSupervisedDataset(train_vl_samples, vl_trainer.processor)
+    eval_ds = QwenVLSupervisedDataset(val_vl_samples, vl_trainer.processor) if val_vl_samples else None
 
-    train_ds = TextSupervisedDataset(train_samples, trainer.tokenizer, max_length=int(config.finetune.max_seq_len))
-    eval_ds = TextSupervisedDataset(val_samples, trainer.tokenizer, max_length=int(config.finetune.max_seq_len)) if val_samples else None
-
-    hparams = FinetuneHyperParams(
+    vl_hparams = VLFineTuneHyperParams(
         num_epochs=int(config.finetune.num_epochs),
         batch_size=int(config.finetune.batch_size),
         learning_rate=float(config.finetune.lr),
@@ -119,10 +113,10 @@ def main(config: DictConfig) -> None:
         save_total_limit=int(getattr(config.finetune, "save_total_limit", 2)),
     )
 
-    logger.info("Launching training")
-    artifacts = trainer.train(train_ds=train_ds, eval_ds=eval_ds, hparams=hparams)
+    logger.info("Launching VL training")
+    artifacts = vl_trainer.train(train_ds=train_ds, eval_ds=eval_ds, hparams=vl_hparams)
 
-    logger.success(f"Finetuning completed. Model saved to {artifacts.model_dir}")
+    logger.success(f"Finetuning completed. Model saved to {artifacts['model_dir']}")
 
 
 if __name__ == "__main__":  # pragma: no cover

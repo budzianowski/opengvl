@@ -1,49 +1,22 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+# pylint: disable=wrong-import-order,ungrouped-imports
 from dataclasses import asdict, dataclass
 from typing import Any
 
+import numpy as np
+import torch
 import wandb
 from loguru import logger
-from omegaconf import DictConfig
+from PIL import Image
 from torch.utils.data import Dataset
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    DataCollatorForLanguageModeling,
-    EarlyStoppingCallback,
-    Trainer,
-    TrainingArguments,
-)
+from transformers import AutoProcessor, EarlyStoppingCallback, Trainer, TrainingArguments
 
 from opengvl.utils.data_types import Episode, FewShotInput
-from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
 
 
-def validate_finetuning_config(config: DictConfig) -> None:
-    """Ensure required top-level keys are present for finetune runs.
-
-    Required sections:
-    - dataset (metadata like name)
-    - data_loader (instantiation params)
-    - model (contains model_id)
-    - finetune (training hyperparameters)
-    - prompts (template for input formatting)
-    """
-    for key in ("dataset", "data_loader", "model", "finetune", "prompts"):
-        ensure_required_keys(config, key)
-
-
 def _true_completion_for_shuffled(episode: Episode) -> list[int]:
-    """Map original completion rates to shuffled frame order.
-
-    Given Episode fields:
-    - original_frames_indices (sorted) with original_frames_task_completion_rates aligned 1:1
-    - shuffled_frames_indices specifying the order presented to the model
-    returns per-shuffled-frame true completion percentages.
-    """
     idx_to_rate: dict[int, int] = dict(
         zip(
             episode.original_frames_indices,
@@ -55,82 +28,131 @@ def _true_completion_for_shuffled(episode: Episode) -> list[int]:
 
 
 @dataclass
-class FinetuneSample:
+class VLSample:
     prompt: str
     target: str
+    images: list[np.ndarray]  # ImageNumpy alias; using np.ndarray here
 
 
-def build_finetune_samples(examples: Iterable[FewShotInput], prompt_template: str) -> list[FinetuneSample]:
-    """Construct text-to-text finetune pairs from FewShot inputs.
-
-    Input prompt: formatted using the provided template and the eval instruction.
-    Target: comma-separated percentages for frames in shuffled order, e.g. "0%, 10%, 20%, ...".
-    """
-    samples: list[FinetuneSample] = []
+def build_vl_samples(examples: list[FewShotInput], prompt_template: str) -> list[VLSample]:
+    samples: list[VLSample] = []
     for ex in examples:
         prompt = format_prompt(prompt_template, instruction=ex.eval_episode.instruction).rstrip()
         truth = _true_completion_for_shuffled(ex.eval_episode)
         target = ", ".join(f"{p}%" for p in truth)
-        samples.append(FinetuneSample(prompt=prompt, target=target))
-    logger.info(f"Built {len(samples)} finetune samples")
+        samples.append(VLSample(prompt=prompt, target=target, images=ex.eval_episode.shuffled_frames))
+    logger.info(f"Built {len(samples)} VL finetune samples")
     return samples
 
 
-class TextSupervisedDataset(Dataset):
-    """Tokenized dataset for supervised fine-tuning of causal LMs.
+def _to_pil(img: np.ndarray) -> Image.Image:
+    if isinstance(img, Image.Image):
+        return img
+    arr = np.clip(img, 0, 255).astype(np.uint8) if img.dtype != np.uint8 else img
+    if arr.ndim == 2:
+        return Image.fromarray(arr, mode="L")
+    return Image.fromarray(arr)
 
-    The loss is computed only on the target portion (after the special answer prefix).
-    """
 
-    def __init__(
-        self,
-        samples: list[FinetuneSample],
-        tokenizer: Any,
-        *,
-        max_length: int = 1024,
-        answer_prefix: str = "\nAnswer: ",
-    ) -> None:
+class QwenVLSupervisedDataset(Dataset):
+    """Dataset that builds Qwen VL chat-style inputs with images and masks labels before assistant output."""
+
+    def __init__(self, samples: list[VLSample], processor: Any) -> None:
         self.samples = samples
-        self.tokenizer = tokenizer
-        self.max_length = int(max_length)
-        self.answer_prefix = answer_prefix
+        self.processor = processor
 
     def __len__(self) -> int:
         return len(self.samples)
 
-    def __getitem__(self, idx: int) -> dict[str, list[int]]:
+    def __getitem__(self, idx: int) -> dict[str, Any]:
         s = self.samples[idx]
-        # Compose full text: [prompt][answer_prefix][target]
-        full = s.prompt + self.answer_prefix + s.target
-        tokenized = self.tokenizer(
-            full,
-            truncation=True,
-            max_length=self.max_length,
-            padding=False,
-            return_tensors=None,
+        pil_images = [_to_pil(im) for im in s.images]
+
+        # Build a single-turn conversation: user provides prompt + N frames, assistant provides target string
+        user_content: list[dict[str, str | Image.Image]] = [{"type": "text", "text": s.prompt}]
+        for i, im in enumerate(pil_images, start=1):
+            user_content.append({"type": "text", "text": f"\nFrame {i}:"})
+            user_content.append({"type": "image", "image": im})
+
+        user_only = [{"role": "user", "content": user_content}]
+        messages = [*user_only, {"role": "assistant", "content": [{"type": "text", "text": s.target}]}]
+
+        # Build text strings via chat template, then process images+text together
+        full_text: str = self.processor.apply_chat_template(
+            messages, add_generation_prompt=False, tokenize=False
         )
-        # Build labels such that only target tokens contribute to loss
-        # Identify prefix length in tokens by re-encoding the prompt+prefix only
-        prefix_ids: list[int] = self.tokenizer(
-            s.prompt + self.answer_prefix, add_special_tokens=True
-        )["input_ids"]
-        prefix_len = len(prefix_ids)
-        input_ids = tokenized["input_ids"]
-        labels: list[int] = [-100] * len(input_ids)
+        user_text: str = self.processor.apply_chat_template(
+            user_only, add_generation_prompt=False, tokenize=False
+        )
+
+        full_proc = self.processor(text=full_text, images=pil_images, return_tensors=None)
+        user_proc = self.processor(text=user_text, images=pil_images, return_tensors=None)
+
+        input_ids = full_proc["input_ids"]
+        attention_mask = full_proc.get("attention_mask")
+        pixel_values = full_proc.get("pixel_values")
+        # pixel_values should be present; processor handles image normalization/resize
+
+        prefix_len = len(user_proc["input_ids"])
+        labels = [-100] * len(input_ids)
         for i in range(prefix_len, len(labels)):
             labels[i] = input_ids[i]
-        tokenized["labels"] = labels
-        return tokenized
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "pixel_values": pixel_values,
+            "labels": labels,
+        }
+
+
+class QwenVLDataCollator:
+    """Simple collator that pads input_ids/labels and stacks pixel_values."""
+
+    def __init__(self, processor: Any) -> None:
+        self.processor = processor
+        self.pad_id = processor.tokenizer.pad_token_id or processor.tokenizer.eos_token_id
+
+    def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
+        max_len = max(len(f["input_ids"]) for f in features)
+        batch_input_ids: list[list[int]] = []
+        batch_attention_mask: list[list[int]] = []
+        batch_labels: list[list[int]] = []
+        pixel_values_list: list[torch.Tensor] = []
+
+        for f in features:
+            ids = f["input_ids"]
+            attn = f.get("attention_mask") or [1] * len(ids)
+            lbls = f["labels"]
+            pad_len = max_len - len(ids)
+            batch_input_ids.append(ids + [self.pad_id] * pad_len)
+            batch_attention_mask.append(attn + [0] * pad_len)
+            batch_labels.append(lbls + [-100] * pad_len)
+            # pixel_values may be tensor per sample (C,H,W) or list; convert to tensor
+            pv = f["pixel_values"]
+            if not isinstance(pv, torch.Tensor):
+                pv = torch.tensor(np.array(pv))  # type: ignore[arg-type]
+            pixel_values_list.append(pv)
+
+        batch = {
+            "input_ids": torch.tensor(batch_input_ids, dtype=torch.long),
+            "attention_mask": torch.tensor(batch_attention_mask, dtype=torch.long),
+            "labels": torch.tensor(batch_labels, dtype=torch.long),
+            "pixel_values": torch.stack(pixel_values_list, dim=0),
+        }
+        return batch
 
 
 @dataclass
-class FinetuneArtifacts:
-    model_dir: str
-    trainer: Trainer
+class VLFineTunePlan:
+    model_id: str
+    output_dir: str
+    wandb_project: str | None = None
+    wandb_run_name: str | None = None
 
 
 @dataclass
-class FinetuneHyperParams:
+class VLFineTuneHyperParams:
     num_epochs: int
     batch_size: int
     learning_rate: float
@@ -143,98 +165,68 @@ class FinetuneHyperParams:
     early_stopping_patience: int
     gradient_checkpointing: bool
     bf16: bool
-    # Optional but useful knobs with sensible defaults
     lr_scheduler_type: str = "cosine"
     max_grad_norm: float = 1.0
     save_total_limit: int = 2
 
-@dataclass
-class WandBConfig:
-    project: str
-    run_name: str
 
-@dataclass
-class FinetunePlan:
-    model_id: str  # Model identifier from huggingface hub (or local path)
-    max_length: int  # Maximum sequence length for input
-    output_dir: str
-    wandb_config: WandBConfig | None = None
-
-
-class FinetuneTrainer:
-    """High-level finetuning orchestrator leveraging HF Transformers Trainer."""
-
-    def __init__(self, plan: FinetunePlan) -> None:
+class QwenVLFinetuneTrainer:
+    def __init__(self, plan: VLFineTunePlan) -> None:
         self.plan = plan
-        logger.info(f"Loading tokenizer and model: {plan.model_id}")
-        # Qwen models often rely on custom code, so trust_remote_code should be True.
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            plan.model_id, use_fast=True, trust_remote_code=True
-        )
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        self.model = AutoModelForCausalLM.from_pretrained(
+        logger.info(f"Loading Qwen VL processor and model: {plan.model_id}")
+        self.processor = AutoProcessor.from_pretrained(plan.model_id, trust_remote_code=True)
+        # Import model class lazily to avoid import if not used
+        from transformers import Qwen2_5_VLForConditionalGeneration  # type: ignore[attr-defined]
+
+        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             plan.model_id, trust_remote_code=True
         )
 
     def train(
-        self, train_ds: Dataset, eval_ds: Dataset | None, hparams: FinetuneHyperParams
-    ) -> FinetuneArtifacts:
-        logger.info("Preparing data collator and training arguments")
-        data_collator = DataCollatorForLanguageModeling(tokenizer=self.tokenizer, mlm=False)
+        self,
+        train_ds: Dataset,
+        eval_ds: Dataset | None,
+        hparams: VLFineTuneHyperParams,
+    ) -> dict[str, Any]:
+        logger.info("Preparing data collator and training arguments (VL)")
+        data_collator = QwenVLDataCollator(self.processor)
 
-        # Disable use_cache to avoid incompatible state with gradient checkpointing
         if hparams.gradient_checkpointing and hasattr(self.model.config, "use_cache"):
             self.model.config.use_cache = False  # type: ignore[attr-defined]
 
-        args_kwargs: dict[str, Any] = {
-            "output_dir": self.plan.output_dir,
-            "num_train_epochs": hparams.num_epochs,
-            "per_device_train_batch_size": hparams.batch_size,
-            "per_device_eval_batch_size": hparams.batch_size,
-            "save_steps": hparams.save_steps,
-            "logging_steps": hparams.logging_steps,
-            "learning_rate": hparams.learning_rate,
-            "warmup_ratio": hparams.warmup_ratio,
-            "weight_decay": hparams.weight_decay,
-            "gradient_accumulation_steps": hparams.gradient_accumulation_steps,
-            "gradient_checkpointing": hparams.gradient_checkpointing,
-            "bf16": hparams.bf16,
-            "save_total_limit": hparams.save_total_limit,
-            "lr_scheduler_type": hparams.lr_scheduler_type,
-            "max_grad_norm": hparams.max_grad_norm,
-            "load_best_model_at_end": bool(eval_ds is not None),
-            "metric_for_best_model": "eval_loss",
-            "greater_is_better": False,
-        }
-        # Only report to W&B if configured
-        if self.plan.wandb_config is not None:
-            args_kwargs["report_to"] = ["wandb"]
-        else:
-            args_kwargs["report_to"] = []
-        if eval_ds is not None:
-            args_kwargs["evaluation_strategy"] = "steps"
-            args_kwargs["eval_steps"] = hparams.eval_steps
-
-        args = TrainingArguments(**args_kwargs)
+        args = TrainingArguments(
+            output_dir=self.plan.output_dir,
+            num_train_epochs=hparams.num_epochs,
+            per_device_train_batch_size=hparams.batch_size,
+            per_device_eval_batch_size=hparams.batch_size,
+            save_steps=hparams.save_steps,
+            logging_steps=hparams.logging_steps,
+            learning_rate=hparams.learning_rate,
+            warmup_ratio=hparams.warmup_ratio,
+            weight_decay=hparams.weight_decay,
+            gradient_accumulation_steps=hparams.gradient_accumulation_steps,
+            gradient_checkpointing=hparams.gradient_checkpointing,
+            bf16=hparams.bf16,
+            save_total_limit=hparams.save_total_limit,
+            lr_scheduler_type=hparams.lr_scheduler_type,
+            max_grad_norm=hparams.max_grad_norm,
+            load_best_model_at_end=bool(eval_ds is not None),
+            metric_for_best_model="eval_loss",
+            greater_is_better=False,
+            evaluation_strategy="steps" if eval_ds is not None else "no",
+            eval_steps=hparams.eval_steps if eval_ds is not None else None,
+            report_to=["wandb"] if (self.plan.wandb_project and self.plan.wandb_run_name) else [],
+        )
 
         callbacks = []
         if eval_ds is not None and hparams.early_stopping_patience > 0:
             callbacks.append(EarlyStoppingCallback(early_stopping_patience=hparams.early_stopping_patience))
 
-        # Initialize W&B with a concise config derived from dataclasses if requested
-        if self.plan.wandb_config is not None:
-            wb_cfg: dict[str, Any] = {**asdict(self.plan), **asdict(hparams)}
-            # Remove nested objects that W&B can't serialize easily
-            wb_cfg.pop("wandb_config", None)
-            wandb.init(
-                project=self.plan.wandb_config.project,
-                name=self.plan.wandb_config.run_name,
-                config=wb_cfg,
-            )
-            logger.info("Weights & Biases logging is enabled")
-        else:
-            logger.info("W&B logging disabled (no wandb_config provided)")
+        # Initialize W&B
+        if self.plan.wandb_project and self.plan.wandb_run_name:
+            cfg = {**asdict(self.plan), **asdict(hparams)}
+            wandb.init(project=self.plan.wandb_project, name=self.plan.wandb_run_name, config=cfg)
+            logger.info("Weights & Biases logging is enabled (VL)")
 
         trainer = Trainer(
             model=self.model,
@@ -245,11 +237,11 @@ class FinetuneTrainer:
             callbacks=callbacks,
         )
 
-        logger.info("Starting training…")
+        logger.info("Starting VL training...")
         trainer.train()
-        logger.success("Training finished")
-        logger.info("Saving final model and tokenizer")
+        logger.success("VL Training finished")
+        logger.info("Saving final model and processor")
         trainer.save_model(self.plan.output_dir)
-        self.tokenizer.save_pretrained(self.plan.output_dir)
+        self.processor.save_pretrained(self.plan.output_dir)
 
-        return FinetuneArtifacts(model_dir=self.plan.output_dir, trainer=trainer)
+        return {"model_dir": self.plan.output_dir, "trainer": trainer}
