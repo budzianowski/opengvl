@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 
+from opengvl.mapper.regex_mapper import RegexMapper
 from opengvl.metrics.voc import VOCMetric
 from opengvl.utils.data_types import Episode, FewShotInput
 from opengvl.utils.inference import PercentagesNormalizationError, predict_on_fewshot_input
@@ -42,7 +43,8 @@ def test_percentages_normalization_error_count_plus_count_issue(monkeypatch):
     def raise_norm_error(text):
         raise PercentagesNormalizationError()
 
-    monkeypatch.setattr("opengvl.utils.inference.extract_percentages", raise_norm_error)
+    # Patch the extract_percentages method of the RegexMapper instance
+    monkeypatch.setattr(RegexMapper, "extract_percentages", staticmethod(raise_norm_error))
     record = predict_on_fewshot_input(
         idx=0,
         total=1,
@@ -52,6 +54,8 @@ def test_percentages_normalization_error_count_plus_count_issue(monkeypatch):
         save_raw=False,
         voc_metric=DummyVOCMetric(),
         dataset_name="dummy",
+        temperature=0.75,
+        mapper=RegexMapper(),
     )
     assert record.error_count["PercentagesNormalizationError"] == 1
     assert record.error_count["PercentagesCountMismatch"] == 1
@@ -72,6 +76,8 @@ def test_count_mismatch_error_count():
         save_raw=False,
         voc_metric=DummyVOCMetric(),
         dataset_name="dummy",
+        temperature=0.75,
+        mapper=RegexMapper(),
     )
     assert record.error_count["PercentagesCountMismatch"] == 1
     assert record.error_count["PercentagesNormalizationError"] == 0

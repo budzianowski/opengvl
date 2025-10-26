@@ -24,13 +24,13 @@ from omegaconf import DictConfig, OmegaConf
 
 from opengvl.data_loaders.base import BaseDataLoader
 from opengvl.utils.data_types import FewShotInput
-from opengvl.utils.training import validate_finetuning_config
 from opengvl.utils.training import (
     QwenVLFinetuneTrainer,
     QwenVLSupervisedDataset,
     VLFineTuneHyperParams,
     VLFineTunePlan,
     build_vl_samples,
+    validate_finetuning_config,
 )
 
 
@@ -67,16 +67,10 @@ def main(config: DictConfig) -> None:
     val_examples: list[FewShotInput] = data_loader.load_fewshot_inputs(n_val) if n_val > 0 else []
 
     if any((len(ex.context_episodes) > 0) for ex in train_examples):
-        raise ValueError(
-            "Finetuning with in-context examples is not supported. Please set dataset.num_context_episodes=0 in the config."
-        )
+        raise ValueError("Finetuning with in-context examples is not supported. Please set dataset.num_context_episodes=0 in the config.")
 
-    logger.info(f'Sampled train={len(train_examples)} val={len(val_examples)} trajectories')
+    logger.info(f"Sampled train={len(train_examples)} val={len(val_examples)} trajectories")
     logger.info("Building finetune samples...")
-
-
-
-
 
     # VL-only training path (no text-only branch)
     wandb_project = getattr(config.finetune, "wandb_project", None)

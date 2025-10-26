@@ -78,12 +78,8 @@ class QwenVLSupervisedDataset(Dataset):
         messages = [*user_only, {"role": "assistant", "content": [{"type": "text", "text": s.target}]}]
 
         # Build text strings via chat template, then process images+text together
-        full_text: str = self.processor.apply_chat_template(
-            messages, add_generation_prompt=False, tokenize=False
-        )
-        user_text: str = self.processor.apply_chat_template(
-            user_only, add_generation_prompt=False, tokenize=False
-        )
+        full_text: str = self.processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+        user_text: str = self.processor.apply_chat_template(user_only, add_generation_prompt=False, tokenize=False)
 
         full_proc = self.processor(text=full_text, images=pil_images, return_tensors=None)
         user_proc = self.processor(text=user_text, images=pil_images, return_tensors=None)
@@ -178,9 +174,7 @@ class QwenVLFinetuneTrainer:
         # Import model class lazily to avoid import if not used
         from transformers import Qwen2_5_VLForConditionalGeneration  # type: ignore[attr-defined]
 
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            plan.model_id, trust_remote_code=True
-        )
+        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(plan.model_id, trust_remote_code=True)
 
     def train(
         self,

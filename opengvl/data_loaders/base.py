@@ -41,6 +41,7 @@ class BaseDataLoader(ABC):
         for _ in range(int(n)):
             lst.append(self.load_fewshot_input())
         return lst
+
     def reset(self) -> None:
         logger.info(f"Resetting {self.__class__.__name__} data loader with seed {self.seed}")
         self._rng = np.random.default_rng(self.seed)
