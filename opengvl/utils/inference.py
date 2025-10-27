@@ -1,6 +1,4 @@
 import json
-import math
-import re
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -8,16 +6,15 @@ from loguru import logger
 from omegaconf import DictConfig
 
 from opengvl.clients.base import BaseModelClient
+from opengvl.mapper.base import BaseMapper
 from opengvl.metrics.base import MetricResult
 from opengvl.metrics.voc import VOCMetric
 from opengvl.results.prediction import PredictionRecord
 from opengvl.utils.constants import N_DEBUG_PROMPT_CHARS
-from opengvl.utils.data_types import Example as FewShotInput
-from opengvl.utils.data_types import InferredEpisode, InferredFewShotResult
+from opengvl.utils.data_types import FewShotInput, InferredEpisode, InferredFewShotResult
 from opengvl.utils.errors import PercentagesCountMismatch, PercentagesNormalizationError
 from opengvl.utils.hydra import ensure_required_keys
 from opengvl.utils.prompts import format_prompt
-from opengvl.mapper.base import BaseMapper
 
 
 def build_inferred_example(
@@ -114,18 +111,13 @@ def predict_on_fewshot_input(
         error_count[PercentagesNormalizationError.__name__] += 1
 
     if len(predicted) != expected_len:
-        logger.error(
-            f"Count mismatch on example {idx}: expected {expected_len}, "
-            f"got {len(predicted)}"
-        )
+        logger.error(f"Count mismatch on example {idx}: expected {expected_len}, " f"got {len(predicted)}")
         error_count[PercentagesCountMismatch.__name__] += 1
 
     inferred: InferredFewShotResult = build_inferred_example(ex, predicted)
 
     if sum(error_count.values()) > 0:
-        metric_res = MetricResult(name=voc_metric.name, value=0, details={
-            "note": f"errors in prediction prevented metric computation {error_count!s}"
-        })
+        metric_res = MetricResult(name=voc_metric.name, value=0, details={"note": f"errors in prediction prevented metric computation {error_count!s}"})
     else:
         metric_res = voc_metric.compute(inferred)
     metrics_payload = {metric_res.name: metric_res.value}
@@ -150,5 +142,5 @@ def predict_on_fewshot_input(
         raw_response=response_text if save_raw else None,
         error_count=error_count,
     )
-    logger.info(f"Example {idx}: preds={len(predicted)}/{len(ex.eval_episode.shuffled_frames)} VOC={metric_res.value}")
+    logger.info(f"FewShotInput {idx}: preds={len(predicted)}/{len(ex.eval_episode.shuffled_frames)} VOC={metric_res.value}")
     return record

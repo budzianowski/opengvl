@@ -26,7 +26,6 @@ class GLMClient(BaseModelClient):
         self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
         logger.info(type(self.processor))
 
-
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         messages = [{"role": "user", "content": []}]
         images = []
@@ -37,13 +36,9 @@ class GLMClient(BaseModelClient):
                 messages[0]["content"].append({"type": "image"})
                 images.append(to_pil(cast(ImageT, ev.image)))
 
-
-        prompt = self.processor.apply_chat_template(
-            messages,
-            add_generation_prompt=True
-        )
+        prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True)
         inputs = self.processor(text=prompt, images=images, return_tensors="pt").to(self.model.device, dtype=torch.bfloat16)
-        
+
         input_len = inputs["input_ids"].shape[-1]
 
         if input_len > self.max_input_length:
@@ -51,11 +46,7 @@ class GLMClient(BaseModelClient):
         logger.info(f"Input length: {input_len}")
 
         generated_ids = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, temperature=temperature)
-        generated_ids_trimmed = [
-            out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        response = self.processor.batch_decode(
-            generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-        )[0]
-        
+        generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids, strict=False)]
+        response = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
+
         return response

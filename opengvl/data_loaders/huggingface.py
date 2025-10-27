@@ -5,8 +5,7 @@ from lerobot.datasets.push_dataset_to_hub.utils import calculate_episode_data_in
 from loguru import logger
 
 from opengvl.data_loaders.base import BaseDataLoader
-from opengvl.utils.data_types import Episode
-from opengvl.utils.data_types import Example as FewShotInput
+from opengvl.utils.data_types import Episode, FewShotInput
 
 disable_progress_bar()
 
@@ -49,7 +48,7 @@ class HuggingFaceDataLoader(BaseDataLoader):
         episode_data_index = calculate_episode_data_index(ds.hf_dataset)
         from_idx = int(episode_data_index["from"][episode_index].item())
         to_idx = int(episode_data_index["to"][episode_index].item())
-        logger.info(f'Loading episode [{episode_index}] frames from {from_idx} to {to_idx} (exclusive)')
+        logger.info(f"Loading episode [{episode_index}] frames from {from_idx} to {to_idx} (exclusive)")
         frames = [ds[i][camera_key] for i in range(from_idx, to_idx)]
         instruction = ds[from_idx]["task"]
         return frames, instruction

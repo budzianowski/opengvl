@@ -8,30 +8,39 @@ defaults:
   - mapping_prompts: default
   - _self_
 
-seed: 42          # Global seed (propagated to loader & any RNG-dependent logic)
+seed: 42
 shuffle: true       # Whether to shuffle frame presentation order
 
-dataset:
-  num_context_episodes: 0  # How many in-context episodes to provide
 
-prediction:
-  num_examples: 50   # How many FewShotInput predictions to perform
-  save_raw: true    # Whether to dump raw model outputs
-  output_dir: ${hydra:run.dir}
-  temperature: 0.75  # Sampling temperature for generation
-
-mapper:
-  max_new_tokens: 1024
-  temperature: 0.75
-  retries: 3
-  mapping_prompt: ${mapping_prompts}
+finetune:
+  num_train_trajectories: 2
+  num_val_trajectories: 1
+  max_seq_len: 2048
+  batch_size: 2
+  num_epochs: 3
+  lr: 2e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  gradient_accumulation_steps: 8
+  logging_steps: 10
+  eval_steps: 50
+  save_steps: 200
+  early_stopping_patience: 3
+  gradient_checkpointing: true
+  bf16: true
+  lr_scheduler_type: cosine
+  max_grad_norm: 1.0
+  save_total_limit: 2
+  wandb_project: opengvl
+  wandb_run_name: finetune-${now:%H-%M-%S}
+  output_dir: ${hydra:run.dir}/finetune
 
 hydra:
   mode: MULTIRUN # comment this if you don't want to sweep
   run:
     dir: results/
   sweep:
-    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-predict
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}-finetune
     subdir: ${hydra.job.num}
   sweeper:
     params:

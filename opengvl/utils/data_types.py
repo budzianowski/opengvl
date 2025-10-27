@@ -65,7 +65,9 @@ class InferredEpisode(Episode):
     """
 
     shuffled_frames_predicted_completion_rates: list[int]  # should be aligned 1:1 with shuffled_frames
-    # if not, that means that model failed to predict for all frames (e.g. returned incomplete list of preds)
+    # if not, that means that model failed to predict for all frames (e.g. returned incomplete list of preds
+    # or extractor failed to parse them all, for instance sometimes LLMs repeats percentages which makes parsing
+    # not obvious)
 
     @classmethod
     def from_predictions(cls, episode: Episode, predictions: list[int]) -> "InferredEpisode":
@@ -84,10 +86,10 @@ class InferredEpisode(Episode):
 
 
 @dataclass
-class Example:
+class FewShotInput:
     """
     Container for a single training/evaluation example consisting of one
-    evaluation episode and multiple context episodes.
+    evaluation episode and 0 or more context episodes.
     """
 
     eval_episode: Episode
@@ -99,7 +101,7 @@ class Example:
         ctx_frames_list = [len(ep.shuffled_frames) for ep in self.context_episodes]
         ctx_frames_total = sum(ctx_frames_list)
         return (
-            "Example("
+            "FewShotInput("
             f"eval_episode_index={self.eval_episode.episode_index}, "
             f"eval_frames={eval_frames}, "
             f"context_episodes={ctx_count}, "

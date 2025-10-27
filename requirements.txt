@@ -10,8 +10,9 @@ tensorflow-datasets>=4.9.9
 tfds>=0.3
 torch>=2.7.1
 torchvision>=0.22.1
-transformers>=4.53.0
+transformers==4.53.0
 
 google-genai>=1.22.0
 
 black>=24.10.0 
+wandb>=0.17.0

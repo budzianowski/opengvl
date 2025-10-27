@@ -24,6 +24,7 @@ outputs/
 # IPython Notebook checkpoints
 .ipynb_checkpoints
 multirun
+wandb/
 
 # =============================================================================
 # IDE & Editor Specific: Visual Studio Code

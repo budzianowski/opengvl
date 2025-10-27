@@ -5,13 +5,12 @@ import numpy as np
 from loguru import logger
 
 from opengvl.utils.aliases import ImageNumpy, ImageT
-from opengvl.utils.data_types import Episode
-from opengvl.utils.data_types import Example as FewShotInput
+from opengvl.utils.data_types import Episode, FewShotInput
 from opengvl.utils.images import to_numpy
 
 
 class BaseDataLoader(ABC):
-    """Abstract base for building Episode/Example structures.
+    """Abstract base for building Episode/FewShotInput structures.
 
     Subclasses should implement ``load_fewshot_input`` and optionally ``reset``.
     This base provides utility methods to transform raw frames into an
@@ -38,7 +37,10 @@ class BaseDataLoader(ABC):
 
     def load_fewshot_inputs(self, n: int) -> list[FewShotInput]:
         """Load ``n`` FewShotInput structures in sequence."""
-        return [self.load_fewshot_input() for _ in range(int(n))]
+        lst = []
+        for _ in range(int(n)):
+            lst.append(self.load_fewshot_input())
+        return lst
 
     def reset(self) -> None:
         logger.info(f"Resetting {self.__class__.__name__} data loader with seed {self.seed}")
@@ -113,10 +115,7 @@ class BaseDataLoader(ABC):
         # Shuffled presentation order
         shuffled_indices = self._maybe_shuffle(original_indices, rng=per_ep_rng)
         shuffled_frames = [frames_np[i] for i in shuffled_indices]
-        shuffled_completion_approx = [
-            original_completion[original_indices.index(i)] for i in shuffled_indices
-        ]
-
+        shuffled_completion_approx = [original_completion[original_indices.index(i)] for i in shuffled_indices]
 
         starting_frame = frames_np[original_indices[0]]
 

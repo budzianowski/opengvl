@@ -42,7 +42,6 @@ class GemmaClient(BaseModelClient):
             raise ValueError()
         logger.info(f"Input length: {input_len}")
 
-
         with torch.inference_mode():
             if temperature > 0.0:
                 output = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, do_sample=True, temperature=temperature)
