@@ -1,5 +1,6 @@
-from typing import cast
+from typing import Any, cast
 
+import torch
 from loguru import logger
 from qwen_vl_utils import process_vision_info
 from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
@@ -15,7 +16,24 @@ class QwenClient(BaseModelClient):
     def __init__(self, model_id: str, rpm: float = 0.0):
         super().__init__(rpm=rpm)
         logger.info(f"Loading Qwen model {model_id}...")
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_id, torch_dtype="auto", device_map="auto")
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        model_kwargs: dict[str, Any] = {"torch_dtype": "auto", "device_map": "auto"}
+        if self.device == "cpu":
+            logger.warning(
+                "CUDA is not available; loading Qwen VL model on CPU with eager attention kernels disabled. "
+                "Expect significantly slower inference."
+            )
+            model_kwargs.update({"attn_implementation": "eager", "torch_dtype": torch.float32, "device_map": None})
+
+        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            model_id,
+            trust_remote_code=True,
+            **model_kwargs,
+        )
+        if self.device == "cpu":
+            self.model.to("cpu")
+
         # model config
         self.processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
         logger.info(type(self.processor))
@@ -40,7 +58,7 @@ class QwenClient(BaseModelClient):
             padding=True,
             return_tensors="pt",
         )
-        inputs = inputs.to("cuda")
+        inputs = inputs.to(self.device)
 
         input_len = inputs["input_ids"].shape[-1]
         if input_len > self.max_input_length:
@@ -48,7 +66,11 @@ class QwenClient(BaseModelClient):
         logger.info(f"Input length: {input_len}")
 
         # Inference: Generation of the output
-        generated_ids = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, temperature=temperature)
+        generated_ids = self.model.generate(
+            **inputs,
+            max_new_tokens=MAX_TOKENS_TO_GENERATE,
+            temperature=temperature,
+        )
         generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids, strict=False)]
 
         output_text = self.processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)

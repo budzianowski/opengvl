@@ -230,7 +230,17 @@ class QwenVLFinetuneTrainer:
         # Import model class lazily to avoid import if not used
         from transformers import Qwen2_5_VLForConditionalGeneration  # type: ignore[attr-defined]
 
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(plan.model_id, trust_remote_code=True)
+        model_kwargs: dict[str, Any] = {"trust_remote_code": True}
+        if torch.cuda.is_available():
+            model_kwargs["torch_dtype"] = "auto"
+        else:
+            logger.warning(
+                "CUDA is not available; loading Qwen VL in eager attention mode on CPU. This path is experimental and "
+                "considerably slower than GPU execution."
+            )
+            model_kwargs.update({"attn_implementation": "eager", "torch_dtype": torch.float32})
+
+        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(plan.model_id, **model_kwargs)
 
     def train(
         self,
@@ -243,6 +253,10 @@ class QwenVLFinetuneTrainer:
 
         if hparams.gradient_checkpointing and hasattr(self.model.config, "use_cache"):
             self.model.config.use_cache = False  # type: ignore[attr-defined]
+
+        if not torch.cuda.is_available() and hparams.bf16:
+            logger.warning("bf16 mixed precision requested but CUDA is unavailable; disabling bf16 for CPU training.")
+            hparams.bf16 = False
 
         args = TrainingArguments(
             output_dir=self.plan.output_dir,
