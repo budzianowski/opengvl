@@ -37,8 +37,6 @@ finetune:
 
 hydra:
   mode: MULTIRUN # comment this if you don't want to sweep
-  searchpath:
-    - file://configs
   run:
     dir: results/
   sweep:
@@ -50,7 +48,6 @@ hydra:
 
   searchpath:
     - file://configs
-    - file://configs/experiments
     - file://configs/dataset
     - file://configs/data_loader
     - file://configs/model

@@ -103,38 +103,18 @@ class QwenVLSupervisedDataset(Dataset):
         user_events = s.to_events()
         user_messages = _events_to_qwen_messages(user_events)
 
-        # Add assistant response
-        messages = [*user_messages, {"role": "assistant", "content": [{"type": "text", "text": s.target}]}]
+        # Ensure user and full messages do not share mutable lists
+        user_content = list(user_messages[0]["content"])
+        user_messages = [{"role": "user", "content": user_content}]
+        messages = [
+            {"role": "user", "content": list(user_content)},
+            {"role": "assistant", "content": [{"type": "text", "text": s.target}]},
+        ]
 
-
-        full_text: str = self.processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
-        user_text: str = self.processor.apply_chat_template(user_messages, add_generation_prompt=False, tokenize=False)
-
-        # Use process_vision_info to extract images like in the client
-        image_inputs, video_inputs = process_vision_info(messages) # type: ignore[arg-type]
-
-        full_proc = self.processor(text=full_text, images=image_inputs, videos=video_inputs, return_tensors=None)
-        user_proc = self.processor(text=user_text, images=image_inputs, videos=video_inputs, return_tensors=None)
-
-        input_ids = full_proc["input_ids"]
-        attention_mask = full_proc.get("attention_mask")
-        pixel_values = full_proc.get("pixel_values")
-        image_grid_thw = full_proc.get("image_grid_thw")
-
-        prefix_len = len(user_proc["input_ids"])
-        labels = [-100] * len(input_ids)
-        for i in range(prefix_len, len(labels)):
-            labels[i] = input_ids[i]
-
-        result = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "pixel_values": pixel_values,
-            "labels": labels,
+        return {
+            "user_messages": user_messages,
+            "messages": messages,
         }
-        if image_grid_thw is not None:
-            result["image_grid_thw"] = image_grid_thw
-        return result
 
 
 class QwenVLDataCollator:
@@ -145,32 +125,73 @@ class QwenVLDataCollator:
         self.pad_id = processor.tokenizer.pad_token_id or processor.tokenizer.eos_token_id
 
     def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
-        max_len = max(len(f["input_ids"]) for f in features)
-        batch_input_ids: list[list[int]] = []
-        batch_attention_mask: list[list[int]] = []
-        batch_labels: list[list[int]] = []
-        pixel_values_list: list[torch.Tensor] = []
+        messages_batch = [f["messages"] for f in features]
+        user_messages_batch = [f["user_messages"] for f in features]
 
-        for f in features:
-            ids = f["input_ids"]
-            attn = f.get("attention_mask") or [1] * len(ids)
-            lbls = f["labels"]
-            pad_len = max_len - len(ids)
-            batch_input_ids.append(ids + [self.pad_id] * pad_len)
-            batch_attention_mask.append(attn + [0] * pad_len)
-            batch_labels.append(lbls + [-100] * pad_len)
-            # pixel_values may be tensor per sample (C,H,W) or list; convert to tensor
-            pv = f["pixel_values"]
-            if not isinstance(pv, torch.Tensor):
-                pv = torch.tensor(np.array(pv))  # type: ignore[arg-type]
-            pixel_values_list.append(pv)
+        full_texts = [
+            self.processor.apply_chat_template(msg, add_generation_prompt=False, tokenize=False)
+            for msg in messages_batch
+        ]
+        user_texts = [
+            self.processor.apply_chat_template(msg, add_generation_prompt=False, tokenize=False)
+            for msg in user_messages_batch
+        ]
 
-        batch = {
-            "input_ids": torch.tensor(batch_input_ids, dtype=torch.long),
-            "attention_mask": torch.tensor(batch_attention_mask, dtype=torch.long),
-            "labels": torch.tensor(batch_labels, dtype=torch.long),
-            "pixel_values": torch.stack(pixel_values_list, dim=0),
+        image_inputs_batch: list[Any] = []
+        video_inputs_batch: list[Any] = []
+        for msg in messages_batch:
+            image_inputs, video_inputs = process_vision_info(msg)  # type: ignore[arg-type]
+            image_inputs_batch.append(image_inputs)
+            video_inputs_batch.append(video_inputs if video_inputs else None)
+
+        videos_arg = video_inputs_batch if any(v is not None for v in video_inputs_batch) else None
+
+        full_proc = self.processor(
+            text=full_texts,
+            images=image_inputs_batch,
+            videos=videos_arg,
+            padding=True,
+            return_tensors="pt",
+        )
+
+        user_proc = self.processor(
+            text=user_texts,
+            images=image_inputs_batch,
+            videos=videos_arg,
+            padding=True,
+            return_tensors="pt",
+        )
+
+        input_ids: torch.Tensor = full_proc["input_ids"]
+        attention_mask: torch.Tensor = full_proc["attention_mask"]
+        labels: torch.Tensor = input_ids.clone()
+
+        pad_token_id = self.pad_id if self.pad_id is not None else self.processor.tokenizer.eos_token_id
+        for idx, user_ids in enumerate(user_proc["input_ids"]):
+            valid_mask = user_ids != pad_token_id
+            prefix_len = int(valid_mask.sum().item())
+            if prefix_len > 0:
+                labels[idx, :prefix_len] = -100
+
+        labels = labels.masked_fill(attention_mask == 0, -100)
+
+        batch: dict[str, torch.Tensor] = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+            "pixel_values": full_proc["pixel_values"],
         }
+
+        optional_keys = (
+            "image_grid_thw",
+            "pixel_attention_mask",
+            "video_grid_thw",
+            "video_frame_mask",
+        )
+        for key in optional_keys:
+            if key in full_proc:
+                batch[key] = full_proc[key]
+
         return batch
 
 
@@ -228,6 +249,7 @@ class QwenVLFinetuneTrainer:
             num_train_epochs=hparams.num_epochs,
             per_device_train_batch_size=hparams.batch_size,
             per_device_eval_batch_size=hparams.batch_size,
+            remove_unused_columns=False,
             save_steps=hparams.save_steps,
             logging_steps=hparams.logging_steps,
             learning_rate=hparams.learning_rate,

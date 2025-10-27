@@ -39,7 +39,6 @@ hydra:
 
   searchpath:
     - file://configs
-    - file://configs/experiments
     - file://configs/dataset
     - file://configs/data_loader
     - file://configs/model
