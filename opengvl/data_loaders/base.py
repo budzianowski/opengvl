@@ -32,7 +32,7 @@ class BaseDataLoader(ABC):
         self.shuffle = bool(shuffle)
         self.seed = int(seed)
         self._rng = np.random.default_rng(self.seed)
-        self
+        self.sampling_method = sampling_method
 
     @abstractmethod
     def load_fewshot_input(self, episode_index: int | None = None) -> FewShotInput:
