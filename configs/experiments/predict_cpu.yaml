@@ -1,21 +1,17 @@
 defaults:
-  - dataset: nyudoor
+  - dataset: cmustretch
   - data_loader: huggingface
-  - model: qwen
+  - model: gemini
   - mapper: gemini
   - prompts: default
   - prompt_phrases: default
   - mapping_prompts: default
   - _self_
 
-# nyudoor
-#TODO: Add kimi to config 
-
 seed: 42          # Global seed (propagated to loader & any RNG-dependent logic)
 shuffle: true       # Whether to shuffle frame presentation order
-sampling_method: heavy_right_tail  # 
- # heavy_left_tail  
-# Method to sample frames from episodes ('random' or 'sequential')
+sampling_method: heavy_right_tail
+
 
 dataset:
   num_context_episodes: 0  # How many in-context episodes to provide
@@ -24,7 +20,7 @@ prediction:
   num_examples: 50   # How many FewShotInput predictions to perform
   save_raw: true    # Whether to dump raw model outputs
   output_dir: ${hydra:run.dir}
-  temperature: 1 # Sampling temperature for generation
+  temperature: 1.0  # Sampling temperature for generation
 
 mapper:
   max_new_tokens: 1024
@@ -42,3 +38,5 @@ hydra:
   sweeper:
     params:
       dataset.num_context_episodes: 0
+
+
