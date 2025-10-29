@@ -2,7 +2,8 @@ from enum import StrEnum
 from typing import Final
 
 IMG_SIZE: Final[int] = 244
-MAX_TOKENS_TO_GENERATE: Final[int] = 1024
+# MAX_TOKENS_TO_GENERATE: Final[int] = 1024
+MAX_TOKENS_TO_GENERATE: Final[int] = 10000
 N_DEBUG_PROMPT_CHARS: Final[int] = 400
 
 

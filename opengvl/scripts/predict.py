@@ -49,8 +49,9 @@ def main(config: DictConfig) -> None:
     output_dir = Path(str(config.prediction.output_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
     model_name_safe = client.model_name.replace("/", "_")
-    starting_time = datetime.now().strftime('%Y%m%d_%H%M%S')
+    starting_time = datetime.now().isoformat().replace(':', '-')
     jsonl_path = output_dir / f"{model_name_safe}_{starting_time}_predictions.jsonl"
+    sampling_method = config.sampling_method
 
     examples = infer_utils.load_fewshot_examples(data_loader, num_examples, config.dataset.name)
     logger.info(f"Loaded {len(examples)} (in-context trajectories (0 or more) + eval trajectory) examples for prediction")
@@ -95,6 +96,7 @@ def main(config: DictConfig) -> None:
     summary['prediction_time'] = starting_time
     summary['temperature'] = float(config.prediction.get("temperature", 1.0))
     summary['num_examples'] = len(records)
+    summary['sampling'] = sampling_method
     summary['metrics'] = dataset_metrics.to_dict()
 
     with (output_dir / f"{model_name_safe}_{starting_time}_summary.json").open("w", encoding="utf-8") as f:

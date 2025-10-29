@@ -121,6 +121,8 @@ def predict_on_fewshot_input(
         error_count[PercentagesCountMismatch.__name__] += 1
 
     inferred: InferredFewShotResult = build_inferred_example(ex, predicted)
+    logger.debug(f"Example: {ex}")
+    logger.debug(f"Inferred example {idx}: {inferred}")
 
     if sum(error_count.values()) > 0:
         metric_res = MetricResult(name=voc_metric.name, value=0, details={

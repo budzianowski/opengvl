@@ -50,12 +50,16 @@ class VOCMetric(Metric):
     def compute(self, example: InferredFewShotResult) -> MetricResult:
         eval_ep = example.eval_episode
         preds = np.array(eval_ep.shuffled_frames_predicted_completion_rates, dtype=float)
+        logger.debug(f"VOC compute | preds={preds}")
         # reorder predictions into chronological order by sorting shuffled indices
         order = np.argsort(eval_ep.shuffled_frames_indices)
+        logger.debug(f"VOC compute | order={order}")
         chrono = preds[order]
+        logger.debug(f"VOC compute | chrono={chrono}")
         logger.debug(f"VOC compute | preds_shape={preds.shape} order_shape={order.shape}")
         # Use the standalone function so implementation logic is unified.
         corr_value = value_order_correlation(chrono, np.arange(len(chrono)))
+        logger.debug(f"VOC compute | corr_value={corr_value}")
         if np.isnan(corr_value):
             # Map undefined correlations to 0.0 for downstream aggregation while
             # preserving a note about the degeneracy.

@@ -25,12 +25,14 @@ class BaseDataLoader(ABC):
         num_context_episodes: int = 0,
         shuffle: bool = False,
         seed: int = 42,
+        sampling_method: str = 'random',
     ) -> None:
         self.num_frames = int(num_frames)
         self.num_context_episodes = int(num_context_episodes)
         self.shuffle = bool(shuffle)
         self.seed = int(seed)
         self._rng = np.random.default_rng(self.seed)
+        self.sampling_method = sampling_method
 
     @abstractmethod
     def load_fewshot_input(self, episode_index: int | None = None) -> FewShotInput:
@@ -52,7 +54,7 @@ class BaseDataLoader(ABC):
             return [100]
         return [round(i / (length - 1) * 100) for i in range(length)]
 
-    def _select_indices(self, total: int) -> list[int]:
+    def _select_indices(self, total: int, sampling='random') -> list[int]:
         """Select up to ``num_frames`` indices from a sequence of size ``total``.
 
         Uses even spacing to maintain temporal coverage and determinism.
@@ -64,7 +66,28 @@ class BaseDataLoader(ABC):
         # Evenly spaced selection over [1, total-1]
         # Exclude first frame (always included)
         # return np.linspace(1, total - 1, self.num_frames, dtype=int).tolist()
-        frames = self._rng.choice(range(1, total), self.num_frames, replace=False)
+        if sampling == 'random':
+            frames = self._rng.choice(range(1, total), self.num_frames, replace=False)
+        elif sampling == 'uniform':
+            frames = np.linspace(1, total - 1, self.num_frames, dtype=int)
+        elif sampling == "heavy_left_tail":
+            probs = np.array([1 / (i + 1) for i in range(1, total)])
+            probs /= probs.sum()
+            frames = self._rng.choice(range(1, total), self.num_frames, replace=False, p=probs)
+        elif sampling == "heavy_right_tail":
+            probs = np.array([1 / (total - i) for i in range(1, total)])
+            probs /= probs.sum()
+            frames = self._rng.choice(range(1, total), self.num_frames, replace=False, p=probs)
+        elif sampling == 'poisson':
+            lam = (self.num_frames + 1) / 2
+            frames_set = set()
+            while len(frames_set) < self.num_frames:
+                sample = int(self._rng.poisson(lam))
+                if 1 <= sample < total:
+                    frames_set.add(sample)
+            frames = np.array(list(frames_set))
+        else:
+            raise ValueError(f"Unknown sampling method: {sampling}")
         frames = np.sort(frames)
         return frames.tolist()
 
@@ -88,6 +111,7 @@ class BaseDataLoader(ABC):
         frames: Sequence[ImageT],
         instruction: str,
         episode_index: int,
+        sampling_method: str = 'random',
     ) -> Episode:
         """Construct an Episode from raw frames.
 
@@ -103,12 +127,14 @@ class BaseDataLoader(ABC):
 
         # Convert and choose subset
         frames_np = self._ensure_numpy(frames)
-        selected_orig = self._select_indices(len(frames_np))
-        selected_frames = [frames_np[i] for i in selected_orig]
+        selected_orig = self._select_indices(len(frames_np), sampling_method)
 
         # Original timeline metadata (sorted ascending)
         original_indices = list(selected_orig)
-        original_completion = self._linear_completion(len(selected_frames))
+        all_frames_length = len(frames_np)
+        original_completion = [
+            round(i / (all_frames_length - 1) * 100) for i in original_indices
+        ]
 
         # Shuffled presentation order
         shuffled_indices = self._maybe_shuffle(original_indices, rng=per_ep_rng)
