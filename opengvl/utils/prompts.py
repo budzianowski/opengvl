@@ -15,3 +15,4 @@ def format_prompt(template: str, *, instruction: str) -> str:
     - {instruction}
     """
     return template.format(instruction=instruction)
+

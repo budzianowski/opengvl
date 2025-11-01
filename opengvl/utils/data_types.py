@@ -109,6 +109,55 @@ class FewShotInput:
             f"context_frames_total={ctx_frames_total}"
             ")"
         )
+    
+@dataclass
+class TrainingEpisode(Episode):
+    descriptions: list[str]  # List of descriptions for training purposes
+    shuffled_descriptions: list[str]  # Descriptions aligned with shuffled frames
+
+    def __post_init__(self):
+        if len(self.original_frames_indices) != len(self.original_frames_task_completion_rates):
+            raise OriginalFramesLengthMismatch(len(self.original_frames_indices), len(self.original_frames_task_completion_rates))
+        if not (len(self.shuffled_frames_indices) == len(self.shuffled_frames) == len(self.shuffled_frames_approx_completion_rates)):
+            raise ShuffledFramesLengthMismatch(
+                len(self.shuffled_frames_indices),
+                len(self.shuffled_frames),
+                len(self.shuffled_frames_approx_completion_rates),
+            )
+        # Optional: ensure shuffled indices are a subset of original indices
+        if not set(self.shuffled_frames_indices).issubset(set(self.original_frames_indices)):
+            raise ShuffledFramesIndicesNotSubset()
+
+        # Ensure shuffled descriptions are aligned with shuffled frames
+        if len(self.shuffled_descriptions) != len(self.shuffled_frames):
+            raise ValueError("Shuffled descriptions must be aligned with shuffled frames.")
+        if not set(self.shuffled_descriptions).issubset(set(self.descriptions)):
+            raise ValueError("Shuffled descriptions must be a subset of the original descriptions.")
+
+@dataclass
+class TrainingFewShotInput:
+    """
+    Container for a single training example consisting of one
+    evaluation episode and 0 or more context episodes.
+    """
+
+    eval_episode: TrainingEpisode
+    context_episodes: list[TrainingEpisode]
+
+    def __repr__(self) -> str:
+        eval_frames = len(self.eval_episode.shuffled_frames)
+        ctx_count = len(self.context_episodes)
+        ctx_frames_list = [len(ep.shuffled_frames) for ep in self.context_episodes]
+        ctx_frames_total = sum(ctx_frames_list)
+        return (
+            "TrainingFewShotInput("
+            f"eval_episode_index={self.eval_episode.episode_index}, "
+            f"eval_frames={eval_frames}, "
+            f"context_episodes={ctx_count}, "
+            f"context_frames_per_episode={ctx_frames_list}, "
+            f"context_frames_total={ctx_frames_total}"
+            ")"
+        )
 
 
 @dataclass

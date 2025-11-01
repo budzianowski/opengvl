@@ -50,6 +50,8 @@ def main(config: DictConfig) -> None:
     n_train = int(config.finetune.num_train_trajectories)
     n_val = int(config.finetune.num_val_trajectories)
     prompt_template: str = config.prompts.template
+    prompt_phrases = dict(config.get("prompt_phrases", {})) if hasattr(config, "prompt_phrases") else {}
+   
 
     logger.info(f"Sampling train={n_train} val={n_val} examples...")
     train_examples: list[FewShotInput] = data_loader.load_fewshot_inputs(n_train)
@@ -73,8 +75,8 @@ def main(config: DictConfig) -> None:
         wandb_run_name=str(wandb_run_name) if wandb_run_name else None,
     )
     vl_trainer = QwenVLFinetuneTrainer(vl_plan)
-    train_vl_samples = build_vl_samples(train_examples, prompt_template)
-    val_vl_samples = build_vl_samples(val_examples, prompt_template) if val_examples else []
+    train_vl_samples = build_vl_samples(train_examples, prompt_template, prompt_phrases)
+    val_vl_samples = build_vl_samples(val_examples, prompt_template, prompt_phrases) if val_examples else []
     train_ds = QwenVLSupervisedDataset(train_vl_samples, vl_trainer.processor)
     eval_ds = QwenVLSupervisedDataset(val_vl_samples, vl_trainer.processor) if val_vl_samples else None
 
@@ -84,6 +86,7 @@ def main(config: DictConfig) -> None:
         learning_rate=float(config.finetune.lr),
         weight_decay=float(config.finetune.weight_decay),
         warmup_ratio=float(config.finetune.warmup_ratio),
+        logging_strategy=str(config.finetune.get("logging_strategy", "steps")),
         gradient_accumulation_steps=int(config.finetune.gradient_accumulation_steps),
         logging_steps=int(config.finetune.logging_steps),
         eval_steps=int(config.finetune.eval_steps),

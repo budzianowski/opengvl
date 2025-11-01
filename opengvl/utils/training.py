@@ -11,6 +11,8 @@ from omegaconf import DictConfig
 from qwen_vl_utils import process_vision_info
 from torch.utils.data import Dataset
 from transformers import AutoProcessor, EarlyStoppingCallback, Trainer, TrainingArguments
+from typing import Sequence, Iterator
+from opengvl.utils.constants import PromptPhraseKey
 
 import wandb
 from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
@@ -21,6 +23,20 @@ from opengvl.utils.prompts import format_prompt
 
 
 def _true_completion_for_shuffled(episode: Episode) -> list[int]:
+    """Get the true completion rates in the order of the shuffled frames.
+    
+    argument:
+        episode: Episode object containing original and shuffled frame info.
+        
+    returns:
+        List of true completion rates aligned with shuffled_frames_indices.
+        
+    example:
+        original_frames_indices = [1, 2, 3]
+        original_frames_task_completion_rates = [10, 20, 30]
+        shuffled_frames_indices = [3, 1, 2]
+        returns [30, 10, 20]
+    """
     idx_to_rate: dict[int, int] = dict(
         zip(
             episode.original_frames_indices,
@@ -31,6 +47,39 @@ def _true_completion_for_shuffled(episode: Episode) -> list[int]:
     return [int(idx_to_rate[i]) for i in episode.shuffled_frames_indices]
 
 
+def iter_prompt_events(
+    prompt_text: str,
+    eval_episode: Episode,
+    context_episodes: Sequence[Episode],
+    *,
+    prompt_phrases: dict[str, str],
+) -> Iterator[Event]:
+    phrases = prompt_phrases
+    # Instruction
+    yield TextEvent(prompt_text)
+    yield TextEvent(phrases[PromptPhraseKey.INITIAL_SCENE_LABEL.value])
+    yield ImageEvent(eval_episode.starting_frame)
+    yield TextEvent(phrases[PromptPhraseKey.INITIAL_SCENE_COMPLETION.value])
+
+    # Context frames (with known completion)
+    counter = 1
+    for ctx_episode in context_episodes:
+        for task_completion, frame in zip(ctx_episode.shuffled_frames_approx_completion_rates, ctx_episode.shuffled_frames, strict=False):
+            yield TextEvent(phrases[PromptPhraseKey.CONTEXT_FRAME_LABEL_TEMPLATE.value].format(i=counter))
+            yield ImageEvent(frame)
+            yield TextEvent(phrases[PromptPhraseKey.CONTEXT_FRAME_COMPLETION_TEMPLATE.value].format(p=task_completion))
+            counter += 1
+
+    for instruction_str in phrases[PromptPhraseKey.EVAL_TASK_COMPLETION_INSTRUCTION.value]:
+        yield TextEvent(instruction_str.format(instruction=eval_episode.instruction))
+
+    for frame in eval_episode.shuffled_frames:
+        yield TextEvent(phrases[PromptPhraseKey.EVAL_FRAME_LABEL_TEMPLATE.value].format(i=counter))
+        yield ImageEvent(frame)
+        yield TextEvent("")
+        counter += 1
+
+
 @dataclass
 class VLSample:
     prompt: str
@@ -38,11 +87,24 @@ class VLSample:
     images: list[np.ndarray]  # ImageNumpy alias; using np.ndarray here
 
     def to_events(self) -> list[Event]:
-        """Convert this sample to a list of Events for consistent formatting."""
+        """Convert this sample to a list of Events for consistent formatting.
+        
+        example:
+            >>> v = VLSample(prompt="Describe the images.", target="A cat and a dog.", images=[img1, img2])
+            >>> events = v.to_events()
+            >>> print(events)
+            [TextEvent(text='Describe the images.'), ImageEvent(image=img1), ImageEvent(image=img2)]
+        """
+
         events: list[Event] = [TextEvent(self.prompt)]
         for img in self.images:
             events.append(ImageEvent(img))
         return events
+    
+@dataclass
+class TrainingSample:
+    prompt_events: list[Event]
+    target: str
 
 
 def validate_finetuning_config(config: DictConfig) -> None:
@@ -57,15 +119,39 @@ def validate_finetuning_config(config: DictConfig) -> None:
         ensure_required_keys(config, key)
 
 
-def build_vl_samples(examples: list[FewShotInput], prompt_template: str) -> list[VLSample]:
-    samples: list[VLSample] = []
+def build_vl_samples(examples: list[FewShotInput], prompt_template: str, prompt_phrases: dict[str, str]) -> list[VLSample]:
+    """Build VL finetuning samples from FewShotInput examples and a prompt template.
+    
+    arguments:
+        examples: List of FewShotInput examples containing eval episodes.
+        prompt_template: Template string for formatting prompts.
+        
+    returns:
+        List of VLSample objects ready for finetuning.
+        
+    example
+        >>> examples = [FewShotInput(eval_episode=episode1), FewShotInput(eval_episode=episode2)]
+        >>> prompt_template = "Please analyze the following instruction: {instruction}"
+        >>> samples = build_vl_samples(examples, prompt_template)
+        >>> print(samples)
+        [VLSample(prompt='Please analyze the following instruction: ...', target='...', images=[...]), ...]
+    """
+    training_samples = []
     for ex in examples:
-        prompt = format_prompt(prompt_template, instruction=ex.eval_episode.instruction).rstrip()
+        messages = []
+        messages.extend(
+            iter_prompt_events(
+                prompt_text=format_prompt(prompt_template, instruction=ex.eval_episode.instruction).rstrip(),
+                eval_episode=ex.eval_episode,
+                context_episodes=ex.context_episodes,
+                prompt_phrases=prompt_phrases,
+            )
+        )
         truth = _true_completion_for_shuffled(ex.eval_episode)
-        target = ", ".join(f"{p}%" for p in truth)
-        samples.append(VLSample(prompt=prompt, target=target, images=ex.eval_episode.shuffled_frames))
-    logger.info(f"Built {len(samples)} VL finetune samples")
-    return samples
+        target = "\n".join(f"Frame {i}: {p}%" for i, p in enumerate(truth))
+        training_samples.append(TrainingSample(prompt_events=messages, target=target))
+
+    return training_samples
 
 
 def _events_to_qwen_messages(events: list[Event]) -> list[dict[str, Any]]:
@@ -73,6 +159,14 @@ def _events_to_qwen_messages(events: list[Event]) -> list[dict[str, Any]]:
     
     This function replicates the logic from QwenClient._generate_from_events
     to ensure training data is formatted identically to inference.
+
+    example:
+        >>> events = [TextEvent("Hello"), ImageEvent(image_array), ImageEvent(image_array2)]
+        >>> messages = _events_to_qwen_messages(events)
+        >>> print(messages)
+        [{'role': 'user', 'content': [{'type': 'text', 'text': 'Hello'},
+                                     {'type': 'image', 'image': <PIL.Image.Image image mode=RGB size=...>},
+                                     {'type': 'image', 'image': <PIL.Image.Image image mode=RGB size=...>}]}]
     """
     messages = [{"role": "user", "content": []}]
     for ev in events:
@@ -97,10 +191,16 @@ class QwenVLSupervisedDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
+        """
+        flow:
+            >>> s = self.samples[idx]
+            >>> print(s.prompt)
+            "Describe the following images.""
+        """
         s = self.samples[idx]
 
         # Build events exactly like the base client does, then convert to Qwen messages
-        user_events = s.to_events()
+        user_events = s.prompt_events
         user_messages = _events_to_qwen_messages(user_events)
 
         # Ensure user and full messages do not share mutable lists
@@ -118,81 +218,129 @@ class QwenVLSupervisedDataset(Dataset):
 
 
 class QwenVLDataCollator:
-    """Simple collator that pads input_ids/labels and stacks pixel_values."""
+    """
+    Collator that:
+      - formats with chat template,
+      - packs images/videos through the same AutoProcessor,
+      - masks labels to only supervise assistant content (+ "<|im_end|>\\n"),
+      - supports an explicit max_length (recommended).
+    """
 
     def __init__(self, processor: Any) -> None:
         self.processor = processor
-        self.pad_id = processor.tokenizer.pad_token_id or processor.tokenizer.eos_token_id
 
-    def __call__(self, features: list[dict[str, Any]]) -> dict[str, Any]:
+    def __call__(self, features: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
         messages_batch = [f["messages"] for f in features]
-        user_messages_batch = [f["user_messages"] for f in features]
 
+        # 1) Template -> text
         full_texts = [
-            self.processor.apply_chat_template(msg, add_generation_prompt=False, tokenize=False)
-            for msg in messages_batch
-        ]
-        user_texts = [
-            self.processor.apply_chat_template(msg, add_generation_prompt=False, tokenize=False)
-            for msg in user_messages_batch
+            self.processor.apply_chat_template(
+                m, add_generation_prompt=False, tokenize=False
+            )
+            for m in messages_batch
         ]
 
-        image_inputs_batch: list[Any] = []
-        video_inputs_batch: list[Any] = []
+        # 2) Vision payloads (per-sample lists)
+        image_inputs_batch: list[list[Any]] = []
         for msg in messages_batch:
-            image_inputs, video_inputs = process_vision_info(msg)  # type: ignore[arg-type]
-            image_inputs_batch.append(image_inputs)
-            video_inputs_batch.append(video_inputs if video_inputs else None)
+            imgs, _ = process_vision_info(msg)  # returns lists
+            image_inputs_batch.append(imgs)
 
-        videos_arg = video_inputs_batch if any(v is not None for v in video_inputs_batch) else None
-
-        full_proc = self.processor(
+        # 3) Tokenize / pack
+        proc = self.processor(
             text=full_texts,
             images=image_inputs_batch,
-            videos=videos_arg,
             padding=True,
             return_tensors="pt",
         )
 
-        user_proc = self.processor(
-            text=user_texts,
-            images=image_inputs_batch,
-            videos=videos_arg,
-            padding=True,
-            return_tensors="pt",
-        )
+        input_ids: torch.Tensor = proc["input_ids"]
+        attention_mask: torch.Tensor = proc["attention_mask"]
 
-        input_ids: torch.Tensor = full_proc["input_ids"]
-        attention_mask: torch.Tensor = full_proc["attention_mask"]
-        labels: torch.Tensor = input_ids.clone()
+        # 4) Build labels via span search
+        labels = torch.full_like(input_ids, fill_value=-100)
+        tok = self.processor.tokenizer
 
-        pad_token_id = self.pad_id if self.pad_id is not None else self.processor.tokenizer.eos_token_id
-        for idx, user_ids in enumerate(user_proc["input_ids"]):
-            valid_mask = user_ids != pad_token_id
-            prefix_len = int(valid_mask.sum().item())
-            if prefix_len > 0:
-                labels[idx, :prefix_len] = -100
+        for b in range(input_ids.size(0)):
+            spans = self.find_assistant_content_sublist_indexes(
+                input_ids[b].tolist(), tok
+            )
+            if not spans:
+                # no assistant in this example; leave -100s
+                continue
 
+            for s, e in spans:
+                # guard against any truncation past e
+                e = min(e, input_ids.size(1))
+                if s < e:
+                    labels[b, s:e] = input_ids[b, s:e]
+
+        # 5) Never train on pads
         labels = labels.masked_fill(attention_mask == 0, -100)
 
+        # 6) Return everything Trainer expects
         batch: dict[str, torch.Tensor] = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
             "labels": labels,
-            "pixel_values": full_proc["pixel_values"],
         }
 
-        optional_keys = (
-            "image_grid_thw",
+        # multimodal extras (present only when applicable)
+        for key in (
+            "pixel_values",
             "pixel_attention_mask",
+            "image_grid_thw",
             "video_grid_thw",
             "video_frame_mask",
-        )
-        for key in optional_keys:
-            if key in full_proc:
-                batch[key] = full_proc[key]
+        ):
+            if key in proc:
+                batch[key] = proc[key]
 
         return batch
+
+    @staticmethod
+    def find_assistant_content_sublist_indexes(
+        input_ids: list[int], tokenizer: Any
+    ) -> list[tuple[int, int]]:
+        """
+        Returns [(begin, end), ...] slices that cover the ASSISTANT **content**
+        (excluding the assistant header) and INCLUDE the trailing "<|im_end|>\\n".
+        Robust to tokenizer/template updates.
+        """
+        start_seq = tokenizer.encode(
+            "<|im_start|>assistant\n", add_special_tokens=False
+        )
+        end_seq = tokenizer.encode("<|im_end|>\n", add_special_tokens=False)
+
+        spans: list[tuple[int, int]] = []
+        n = len(input_ids)
+        i = 0
+
+        while i <= n - len(start_seq):
+            # find the next assistant header
+            if input_ids[i : i + len(start_seq)] == start_seq:
+                begin = i + len(start_seq)  # start after header
+
+                # find matching end marker
+                j = begin
+                end = None
+                while j <= n - len(end_seq):
+                    if input_ids[j : j + len(end_seq)] == end_seq:
+                        end = j + len(end_seq)  # include end tag
+                        break
+                    j += 1
+
+                if end is None:
+                    # no closing tag (truncated example) -> supervise to end
+                    spans.append((begin, n))
+                    break
+
+                spans.append((begin, end))
+                i = end
+            else:
+                i += 1
+
+        return spans
 
 
 @dataclass
@@ -210,6 +358,7 @@ class VLFineTuneHyperParams:
     learning_rate: float
     weight_decay: float
     warmup_ratio: float
+    logging_strategy: str
     gradient_accumulation_steps: int
     logging_steps: int
     eval_steps: int
@@ -231,14 +380,17 @@ class QwenVLFinetuneTrainer:
         from transformers import Qwen2_5_VLForConditionalGeneration  # type: ignore[attr-defined]
 
         model_kwargs: dict[str, Any] = {"trust_remote_code": True}
-        if torch.cuda.is_available():
-            model_kwargs["torch_dtype"] = "auto"
+        if torch.cuda.is_available():            
+            model_kwargs["dtype"] = "auto"
         else:
             logger.warning(
                 "CUDA is not available; loading Qwen VL in eager attention mode on CPU. This path is experimental and "
                 "considerably slower than GPU execution."
             )
-            model_kwargs.update({"attn_implementation": "eager", "torch_dtype": torch.float32})
+            model_kwargs.update({"attn_implementation": "eager", "dtype": torch.float32})
+
+        model_kwargs["device_map"] = "cuda:0"
+        logger.info("Using GPU: cuda:0")
 
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(plan.model_id, **model_kwargs)
 
@@ -278,10 +430,11 @@ class QwenVLFinetuneTrainer:
             load_best_model_at_end=bool(eval_ds is not None),
             metric_for_best_model="eval_loss",
             greater_is_better=False,
-            eval_strategy="epoch" if eval_ds is not None else "no",
-            save_strategy="epoch",
+            logging_strategy=hparams.logging_strategy,
+            eval_strategy="steps" if eval_ds is not None else "no",
+            save_strategy="steps",
             eval_steps=hparams.eval_steps if eval_ds is not None else None,
-            report_to=["wandb"] if (self.plan.wandb_project and self.plan.wandb_run_name) else [],
+            report_to="wandb" if (self.plan.wandb_project and self.plan.wandb_run_name) else [],
         )
 
         callbacks = []
