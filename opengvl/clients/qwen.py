@@ -11,13 +11,15 @@ from qwen_vl_utils import process_vision_info
 
 
 class QwenClient(BaseModelClient):
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", rpm: float = 0.0):
+    def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", rpm: float = 0.0, max_input_length: int = 32768 ):
         super().__init__(rpm=rpm)
         logger.info(f"Loading Qwen model {model_name}...")
         self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
         self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
         logger.info(type(self.processor))
         self.model_name = model_name
+        self.max_input_length = max_input_length
+    
 
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         messages = [{"role": "user", "content": []}]
@@ -47,7 +49,15 @@ class QwenClient(BaseModelClient):
         logger.info(f"Input length: {input_len}")
 
         # Inference: Generation of the output
-        generated_ids = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, temperature=temperature)
+        if temperature == 0.0:
+            generated_ids = self.model.generate(**inputs, max_new_tokens=MAX_TOKENS_TO_GENERATE, do_sample=False)
+        else:
+            generated_ids = self.model.generate(
+                **inputs,
+                max_new_tokens=MAX_TOKENS_TO_GENERATE,
+                do_sample=True,
+                temperature=temperature
+            )
         generated_ids_trimmed = [
             out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
         ]
