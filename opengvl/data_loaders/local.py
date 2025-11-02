@@ -52,7 +52,7 @@ class LocalDataLoader(BaseDataLoader):
                 logger.warning(f"Skipping unreadable image {p}: {exc}")
         return images
 
-    def load_fewshot_input(self, episode_index: int| None = None) -> FewShotInput:
+    def load_fewshot_input(self, episode_index: int | None = None) -> FewShotInput:
         if episode_index is None:
             episode_index = 0
         if episode_index < 0 or episode_index >= len(self.episodes_files):
