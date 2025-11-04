@@ -119,7 +119,7 @@ def validate_finetuning_config(config: DictConfig) -> None:
         ensure_required_keys(config, key)
 
 
-def build_vl_samples(examples: list[FewShotInput], prompt_template: str, prompt_phrases: dict[str, str]) -> list[VLSample]:
+def build_vl_samples(examples: list[FewShotInput], prompt_template: str, prompt_phrases: dict[str, str]) -> list[TrainingSample]:
     """Build VL finetuning samples from FewShotInput examples and a prompt template.
     
     arguments:
@@ -127,14 +127,14 @@ def build_vl_samples(examples: list[FewShotInput], prompt_template: str, prompt_
         prompt_template: Template string for formatting prompts.
         
     returns:
-        List of VLSample objects ready for finetuning.
+        List of TrainingSample objects ready for finetuning.
         
     example
         >>> examples = [FewShotInput(eval_episode=episode1), FewShotInput(eval_episode=episode2)]
         >>> prompt_template = "Please analyze the following instruction: {instruction}"
         >>> samples = build_vl_samples(examples, prompt_template)
         >>> print(samples)
-        [VLSample(prompt='Please analyze the following instruction: ...', target='...', images=[...]), ...]
+        [TrainingSample(prompt_events=[...], target='...'), ...]
     """
     training_samples = []
     for ex in examples:
@@ -183,7 +183,7 @@ def _events_to_qwen_messages(events: list[Event]) -> list[dict[str, Any]]:
 class QwenVLSupervisedDataset(Dataset):
     """Dataset that builds Qwen VL chat-style inputs with images and masks labels before assistant output."""
 
-    def __init__(self, samples: list[VLSample], processor: Any) -> None:
+    def __init__(self, samples: list[TrainingSample], processor: Any) -> None:
         self.samples = samples
         self.processor = processor
 
