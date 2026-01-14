@@ -92,6 +92,7 @@ class BaseModelClient(ABC):
                 logger.warning(f"Model generation attempt {call_attempt} failed: {e}")
                 timesleep = 2 ** (call_attempt + 2)
                 logger.warning(f"Retrying after {timesleep} seconds...")
+                logger.error(f"Error details: {e}", exc_info=True) 
                 sleep(timesleep)
                 continue
             return res

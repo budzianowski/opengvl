@@ -1,7 +1,7 @@
 from typing import cast
 import torch
 from loguru import logger
-from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
+from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration, Qwen3VLForConditionalGeneration, Qwen3VLMoeForConditionalGeneration
 
 from opengvl.clients.base import BaseModelClient
 from opengvl.utils.aliases import Event, ImageEvent, ImageT, TextEvent
@@ -13,13 +13,22 @@ from qwen_vl_utils import process_vision_info
 class QwenClient(BaseModelClient):
     def __init__(self, model_name: str = "Qwen/Qwen2.5-VL-3B-Instruct", rpm: float = 0.0, max_input_length: int = 32768 ):
         super().__init__(rpm=rpm)
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
-        self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
-        logger.info(type(self.processor))
         self.model_name = model_name
         self.max_input_length = max_input_length
-    
 
+        if "qwen3" in model_name.lower() and "a3b" in model_name.lower():
+            logger.info(f"Loading Qwen3 model {model_name} ...")
+            self.model = Qwen3VLMoeForConditionalGeneration.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
+        if "qwen3" in model_name.lower() and "a3b" not in model_name.lower():
+            logger.info(f"Loading Qwen3 model {model_name} ...")
+            self.model = Qwen3VLForConditionalGeneration.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
+        if "qwen2.5" in model_name.lower():
+            logger.info(f"Loading Qwen model {model_name} ...")
+            self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
+
+        self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+        logger.info(type(self.processor))
+    
     def _generate_from_events(self, events: list[Event], temperature: float) -> str:
         messages = [{"role": "user", "content": []}]
         for ev in events:
